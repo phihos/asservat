@@ -28,6 +28,22 @@ class GoShards(unittest.TestCase):
         with self.assertRaises(ValueError):
             gate.shards(["TestA", "TestA"])
 
+    def test_ci_partition_is_balanced_complete_and_disjoint(self):
+        names = [f"Test{index:03}" for index in range(30)]
+        weights = {"Test007": 100, "Test020": 60}
+        parts = gate.balanced(names, weights, 3)
+        self.assertEqual(parts, gate.balanced(list(reversed(names)), weights, 3))
+        self.assertEqual(sorted(n for part in parts for n in part), names)
+        self.assertIn(["Test007"], [[n for n in part if n in weights] for part in parts])
+        for bad in ((names, 0), (names[:2], 3), (names + names[:1], 2)):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                gate.balanced(bad[0], weights, bad[1])
+        self.assertEqual(gate.selected_shard([]), None)
+        self.assertEqual(gate.selected_shard(["--shard", "3/8"]), (3, 8))
+        for argv in (["--shard", "8/8"], ["--shard", "0/1"], ["--run", "TestA"], ["--shard", "-1/4"]):
+            with self.subTest(argv=argv), self.assertRaises(ValueError):
+                gate.selected_shard(argv)
+
     def test_actual_runs_and_terminal_results_must_match(self):
         def encode(events):
             return "\n".join(json.dumps({"Package": "p", "Action": action, **({"Test": name} if name else {})}) for action, name in events)

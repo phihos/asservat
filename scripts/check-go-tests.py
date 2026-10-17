@@ -15,6 +15,10 @@ FLAGS = ["-race", "-count=1", "-timeout=15m"]
 # its 15-minute timeout with no test hung. 40 keeps every test, flag and the
 # per-run timeout unchanged.
 SHARD_SIZE = 40
+# CI splits the gate across jobs (--shard I/N): job 0 runs every other
+# package, jobs 1..N-1 a duration-balanced part of the Kubernetes inventory.
+# Durations come from a recorded local gate; unknown tests weigh 5 s.
+DURATIONS = Path(__file__).with_name("go-test-durations.json")
 NAME = re.compile(r"(?:Test|Fuzz|Example)[A-Za-z0-9_]*\Z")
 
 
@@ -40,6 +44,21 @@ def shards(names):
     if Counter(n for group in groups for n in group) != Counter(names):
         raise ValueError("Shards do not cover the discovered inventory exactly once")
     return groups
+
+
+def balanced(names, weights, count):
+    """Longest-processing-time partition; deterministic, complete and disjoint."""
+    if count < 1 or len(names) < count or len(names) != len(set(names)):
+        raise ValueError("Invalid CI partition")
+    bins = [[0.0, index, []] for index in range(count)]
+    for name in sorted(names, key=lambda n: (-weights.get(n, 5), n)):
+        part = min(bins, key=lambda b: (b[0], b[1]))
+        part[0] += weights.get(name, 5)
+        part[2].append(name)
+    parts = [sorted(b[2]) for b in bins]
+    if Counter(n for part in parts for n in part) != Counter(names):
+        raise ValueError("CI partition does not cover the inventory exactly once")
+    return parts
 
 
 def checked_shard_events(output, package, expected):
@@ -83,19 +102,34 @@ def run(command, capture=False):
     return result.stdout
 
 
+def selected_shard(argv):
+    if not argv:
+        return None
+    if len(argv) != 2 or argv[0] != "--shard" or not re.fullmatch(r"[0-9]+/[0-9]+", argv[1]):
+        raise ValueError("This gate takes no test-selection or framework arguments except --shard I/N")
+    index, count = map(int, argv[1].split("/"))
+    if not 2 <= count <= 32 or not 0 <= index < count:
+        raise ValueError("--shard needs 0 <= I < N and 2 <= N <= 32")
+    return index, count
+
+
 def main():
-    if len(sys.argv) != 1:
-        raise ValueError("This complete gate takes no test-selection or framework arguments")
+    shard = selected_shard(sys.argv[1:])
     packages = run(["go", "list", "./..."], capture=True).splitlines()
     if len(packages) != len(set(packages)) or packages.count(KUBERNETES) != 1:
         raise ValueError("Incomplete or ambiguous package inventory")
-    names = discovered_names(run(["go", "test", *FLAGS, "-list", "^(Test|Fuzz|Example)", KUBERNETES], capture=True), KUBERNETES)
-    groups = shards(names)
     # Keep every other package under the original complete-package selection.
     other = [p for p in packages if p != KUBERNETES]
     if not other:
         raise ValueError("Missing non-Kubernetes packages")
-    run(["go", "test", *FLAGS, *other])
+    if not shard or shard[0] == 0:
+        run(["go", "test", *FLAGS, *other])
+    if shard and shard[0] == 0:
+        print(f"CI shard 0/{shard[1]}: {len(other)} full packages", flush=True)
+        return
+    names = discovered_names(run(["go", "test", *FLAGS, "-list", "^(Test|Fuzz|Example)", KUBERNETES], capture=True), KUBERNETES)
+    selected = balanced(names, json.loads(DURATIONS.read_text()), shard[1] - 1)[shard[0] - 1] if shard else names
+    groups = shards(selected)
     completed = []
     for index, group in enumerate(groups, 1):
         pattern = "^(" + "|".join(re.escape(name) for name in group) + ")$"
@@ -104,8 +138,11 @@ def main():
         skipped = checked_shard_events(output, KUBERNETES, group)
         print(f"Verified group {index}: {len(group)} run/results, {len(skipped)} explicit skips", flush=True)
         completed.extend(group)
-    if Counter(completed) != Counter(names):
-        raise ValueError("Completed groups do not cover the complete discovered inventory exactly once")
+    if Counter(completed) != Counter(selected):
+        raise ValueError("Completed groups do not cover the selected inventory exactly once")
+    if shard:
+        print(f"CI shard {shard[0]}/{shard[1]}: {len(selected)} of {len(names)} Kubernetes tests in {len(groups)} sequential groups", flush=True)
+        return
     print(f"Go tests complete: {len(other)} full packages and {len(names)} Kubernetes tests in {len(groups)} sequential groups", flush=True)
 
 

@@ -1,0 +1,96 @@
+name: CI
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["test/results/**"]
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+env:
+  # Recorded local results are evidence, not inputs; never fetch them.
+  CHECKOUT_SPARSE: |
+    /*
+    !/test/results/
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+      - uses: ./.github/actions/setup
+        with: { helm: "true" }
+      - name: Specification, architecture, schema and Helm gates
+        run: >-
+          make -k -j4 -O
+          spec-check architecture-check design-check openapi-check live-check download-check investigation-check
+          go-architecture-check manifest-schema-check investigation-schema-check permission-schema-check
+          policy-schema-check permission-crd-check control-schema-check start-crd-check retention-crd-check
+          capacity-crd-check helm-check
+      - run: python3 scripts/test-go-shards.py
+
+  go:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+      - uses: ./.github/actions/setup
+        with: { sql-tools: "true" }
+      - run: go vet ./...
+      - run: make sql-check
+      # Warm every build the other jobs use: race test packages for the test
+      # shards, the static product binary and integration packages for native
+      # suites. Only main saves the cache, trimmed to entries this run used.
+      - name: Compile everything
+        run: |
+          go test -race -count=1 -run '^$' ./... >/dev/null
+          go test -count=1 -run '^$' ./test/integration ./internal/adapters/kms ./internal/adapters/kubernetes >/dev/null
+          CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /dev/null ./cmd/asservat
+      - if: github.ref == 'refs/heads/main'
+        run: find ~/.cache/go-build -type f -mmin +90 -delete
+      - if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+
+  # scripts/check-go-tests.py --shard: shard 0 runs every package except the
+  # Kubernetes adapter; shards 1-7 run duration-balanced parts of its tests.
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    name: test (${{ matrix.shard }}/8)
+    steps:
+      - uses: actions/checkout@v7
+        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+      - uses: ./.github/actions/setup
+      - run: python3 scripts/check-go-tests.py --shard ${{ matrix.shard }}/8
+
+  console:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
+      - uses: ./.github/actions/setup
+        with: { console: "true" }
+      - id: playwright
+        run: echo "version=$(node -p "require('./web/node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - run: cd web && npx playwright install --only-shell chromium
+      - run: make console-check console-browser-check

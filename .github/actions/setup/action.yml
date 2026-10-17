@@ -1,0 +1,79 @@
+name: Toolchain
+description: Go, Python, optional console modules and pinned SQL/kind/Helm tools, all cached.
+inputs:
+  console:
+    description: Restore or install web/node_modules.
+    default: "false"
+  sql-tools:
+    description: Install the pinned sqlc/goose into ~/.cache/asservat-build/bin.
+    default: "false"
+  kind:
+    description: Install the pinned kind binary.
+    default: "false"
+  helm:
+    description: Install the pinned Helm binary.
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@v7
+      with:
+        go-version-file: go.mod
+        cache: false
+    # One shared module/build cache. Only the main-branch build job saves it;
+    # Go's content-addressed cache stays useful when restored from an older key.
+    - uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
+        restore-keys: |
+          go-${{ runner.os }}-${{ hashFiles('go.sum') }}-
+          go-${{ runner.os }}-
+    - shell: bash
+      run: mkdir -p ~/.cache/asservat-build/tmp
+    - uses: actions/setup-python@v7
+      with:
+        python-version: "3.14"
+        cache: pip
+        cache-dependency-path: requirements-spec.txt
+    - shell: bash
+      run: pip install --disable-pip-version-check -q -r requirements-spec.txt
+
+    - if: inputs.console == 'true'
+      uses: actions/setup-node@v7
+      with:
+        node-version: "26"
+    - if: inputs.console == 'true'
+      id: modules
+      uses: actions/cache@v6
+      with:
+        path: web/node_modules
+        key: node-modules-${{ runner.os }}-${{ hashFiles('web/package-lock.json') }}
+    - if: inputs.console == 'true' && steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      run: make console-install
+
+    - if: inputs.sql-tools == 'true'
+      id: sqltools
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/asservat-build/bin
+        key: sql-tools-${{ runner.os }}-${{ hashFiles('Makefile') }}
+    - if: inputs.sql-tools == 'true' && steps.sqltools.outputs.cache-hit != 'true'
+      shell: bash
+      run: make sql-tools
+
+    - if: inputs.kind == 'true'
+      shell: bash
+      run: |
+        curl -fsSLo /tmp/kind https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
+        echo "aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d  /tmp/kind" | sha256sum -c -
+        sudo install -m 0755 /tmp/kind /usr/local/bin/kind
+    - if: inputs.helm == 'true'
+      shell: bash
+      run: |
+        curl -fsSLo /tmp/helm.tgz https://get.helm.sh/helm-v4.3.0-linux-amd64.tar.gz
+        echo "86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb  /tmp/helm.tgz" | sha256sum -c -
+        sudo tar -xzf /tmp/helm.tgz -C /usr/local/bin --strip-components=1 linux-amd64/helm
