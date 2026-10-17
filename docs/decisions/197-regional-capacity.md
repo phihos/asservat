@@ -398,3 +398,14 @@ regional slot.
     limiters. The connection layer had flattened the channel's step; it
     now passes it through, the answer distinguishes `window` from `keys`,
     and each failed serve logs its elapsed time.
+  - [CI run 9](../../test/results/adr197-continuation-ci-9/native-continuation-1/context-storage-environment.json)
+    (run 39040224004) names the cause: the region's dominant refusal is
+    `serve/answer/channel/candidates (hub-channel)`. Each probe answer
+    re-reads the hub's owner candidates over the lifecycle channel, and
+    the installed federation admits two conversations at once and answers
+    429 beyond that. Those reads take about 20 ms, but registration
+    conversations take 1.4 s or more and failed repeatedly (`federation
+    registration failed`), so they held both slots. The installed
+    federation now admits four conversations; its SQL pools stay at one
+    connection each. The window hypothesis is not supported: the failures
+    are channel refusals, not expired bounds.

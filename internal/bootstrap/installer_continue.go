@@ -377,6 +377,14 @@ func converge(ctx context.Context, limit time.Duration, step func() error) error
 	}
 }
 
+// federationConcurrency is how many lifecycle conversations the installed
+// federation admits at once; it answers 429 beyond that. Two served only
+// the regional executor and renewal. ADR-197's two capacity standbys add a
+// steady stream of short owner reads, which CI continuation run 9 saw
+// refused as hub-channel while slower registration conversations held both
+// slots. Each federation SQL pool stays at one connection.
+const federationConcurrency = 4
+
 // fixedStepError names a fixed continuation sub-step for the stop message.
 type fixedStepError struct {
 	step string
@@ -1376,7 +1384,7 @@ func (k *InstallerContinuation) Federation(ctx context.Context, inventory kube.I
 	prefix := "asservat-" + strings.ReplaceAll(installation, "-", "")
 	guard := owner.Guard()
 	deployment := contracts.FederationDeployment{Format: contracts.FederationDeploymentFormat, InstallationID: installation, ClusterID: k.record.Scope.ClusterID,
-		PermissionRootID: owner.PermissionRootID, Port: contracts.FederationPort, Postgres: owner.Postgres, AuditStore: owner.AuditStore, Concurrency: 2, Owner: &guard,
+		PermissionRootID: owner.PermissionRootID, Port: contracts.FederationPort, Postgres: owner.Postgres, AuditStore: owner.AuditStore, Concurrency: federationConcurrency, Owner: &guard,
 		KeyService: contracts.FederationKeyService{Endpoint: owner.KeyService.Endpoint, Roots: owner.KeyService.Roots, AuditMount: owner.KeyService.AuditMount,
 			AuditKey: prefix + "-federation-audit", PKIMount: f.ConnectorPKIMount, ClientRole: prefix + "-connector-client", ServerRole: prefix + "-connector-server"}}
 	recipe, err := providerconfig.FederationProviderRecipeFor(deployment, contracts.FederationProviderAuthentication{AuthMount: k.input.OwnerProvider.AuthMount,

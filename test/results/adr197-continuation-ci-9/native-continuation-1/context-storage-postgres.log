@@ -1,0 +1,200 @@
+2026-10-17 14:32:20.694 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_76" by role "postgres"
+2026-10-17 14:32:23.293 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_77" by role "postgres"
+2026-10-17 14:32:25.891 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_85" by role "postgres"
+2026-10-17 14:32:28.496 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_43" by role "postgres"
+2026-10-17 14:32:31.101 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_44" by role "postgres"
+2026-10-17 14:32:33.695 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_45" by role "postgres"
+2026-10-17 14:32:36.296 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_48" by role "postgres"
+2026-10-17 14:32:38.897 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_49" by role "postgres"
+2026-10-17 14:32:41.494 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_50" by role "postgres"
+2026-10-17 14:32:44.097 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_51" by role "postgres"
+2026-10-17 14:32:46.695 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_52" by role "postgres"
+2026-10-17 14:32:49.293 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_56" by role "postgres"
+2026-10-17 14:32:51.896 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_24" by role "postgres"
+2026-10-17 14:32:54.499 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_25" by role "postgres"
+2026-10-17 14:32:57.096 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_26" by role "postgres"
+2026-10-17 14:32:59.696 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_27" by role "postgres"
+2026-10-17 14:33:02.291 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_65" by role "postgres"
+2026-10-17 14:33:04.897 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_66" by role "postgres"
+2026-10-17 14:33:07.496 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_53" by role "postgres"
+2026-10-17 14:33:10.096 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_54" by role "postgres"
+2026-10-17 14:33:12.695 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_55" by role "postgres"
+2026-10-17 14:33:15.297 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_70" by role "postgres"
+2026-10-17 14:33:17.892 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_71" by role "postgres"
+2026-10-17 14:33:20.499 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_72" by role "postgres"
+2026-10-17 14:33:23.095 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_73" by role "postgres"
+2026-10-17 14:33:25.697 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_78" by role "postgres"
+2026-10-17 14:33:28.292 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_79" by role "postgres"
+2026-10-17 14:33:30.897 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_80" by role "postgres"
+2026-10-17 14:33:33.496 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_81" by role "postgres"
+2026-10-17 14:33:36.094 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_82" by role "postgres"
+2026-10-17 14:33:38.702 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_83" by role "postgres"
+2026-10-17 14:33:41.296 UTC [296] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_pub_84" by role "postgres"
+2026-10-17 14:35:29.824 UTC [388] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_own_00" by role "postgres"
+2026-10-17 14:35:38.716 UTC [388] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_own_01" by role "postgres"
+2026-10-17 14:35:47.618 UTC [388] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_own_02" by role "postgres"
+2026-10-17 14:35:56.518 UTC [388] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_own_03" by role "postgres"
+2026-10-17 14:36:01.617 UTC [94] LOG:  checkpoint starting: time
+2026-10-17 14:36:05.418 UTC [388] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_own_04" by role "postgres"
+2026-10-17 14:36:14.326 UTC [388] WARNING:  role "postgres" has not been granted membership in role "as_8cab7d9cf6c94caaa4ef3c2cf31c0297_own_05" by role "postgres"
+2026-10-17 14:36:35.876 UTC [94] LOG:  checkpoint complete: wrote 342 buffers (2.1%), wrote 5 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=34.258 s, sync=0.001 s, total=34.260 s; sync files=89, longest=0.001 s, average=0.001 s; distance=2966 kB, estimate=8489 kB; lsn=0/2A432F0, redo lsn=0/29DCF90
+2026-10-17 14:38:32.929 UTC [661] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:38:32.929 UTC [661] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:38:32.929 UTC [661] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:38:35.610 UTC [661] ERROR:  capacity permission root unavailable
+2026-10-17 14:38:35.610 UTC [661] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 25 at RAISE
+2026-10-17 14:38:35.610 UTC [661] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:38:38.770 UTC [661] ERROR:  capacity permission root unavailable
+2026-10-17 14:38:38.770 UTC [661] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 25 at RAISE
+2026-10-17 14:38:38.770 UTC [661] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:38:39.923 UTC [673] ERROR:  query returned no rows
+2026-10-17 14:38:39.923 UTC [673] CONTEXT:  PL/pgSQL function public.activate_cluster_bootstrap(uuid,uuid,bytea,bytea) line 7 at SQL statement
+2026-10-17 14:38:39.923 UTC [673] STATEMENT:  SELECT lineage::text, generation, issued_at, valid_until, replay, fenced FROM public.activate_cluster_bootstrap($1,$2,$3,$4)
+2026-10-17 14:39:36.422 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:36.422 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:36.422 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:38.460 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:38.460 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:38.460 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:40.500 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:40.500 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:40.500 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:42.542 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:42.542 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:42.542 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:44.585 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:44.585 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:44.585 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:46.628 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:46.628 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:46.628 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:48.669 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:48.669 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:48.669 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:49.756 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:49.756 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:49.756 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:51.764 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:51.764 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:51.764 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:53.809 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:53.809 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:53.809 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:55.855 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:55.855 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:55.855 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:57.900 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:57.900 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:57.900 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:39:59.940 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:39:59.940 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:39:59.940 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:40:01.027 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:40:01.027 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:40:01.027 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:40:03.008 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:40:03.008 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:40:03.008 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:40:04.094 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:40:04.094 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:40:04.094 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:40:05.178 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:40:05.178 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:40:05.178 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:40:06.262 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:40:06.262 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:40:06.262 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:40:08.117 UTC [829] ERROR:  capacity source acceptance unavailable
+2026-10-17 14:40:08.117 UTC [829] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 14:40:08.117 UTC [829] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 14:41:01.973 UTC [94] LOG:  checkpoint starting: time
+2026-10-17 14:41:46.752 UTC [94] LOG:  checkpoint complete: wrote 448 buffers (2.7%), wrote 6 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=44.776 s, sync=0.002 s, total=44.779 s; sync files=167, longest=0.001 s, average=0.001 s; distance=4382 kB, estimate=8079 kB; lsn=0/2F73C50, redo lsn=0/2E24A30
+2026-10-17 14:43:41.384 UTC [829] ERROR:  canceling statement due to user request
+2026-10-17 14:43:41.384 UTC [829] CONTEXT:  PL/pgSQL function public.connector_digest(jsonb) line 5 at FOR over SELECT rows
+	SQL function "capacity_json_digest" statement 1
+	PL/pgSQL function public.capacity_context_protocol_backing(jsonb,jsonb) line 23 at IF
+	PL/pgSQL function public.capacity_compile_root(jsonb,jsonb) line 39 at assignment
+	PL/pgSQL function public.capacity_lock_root_observation(uuid,text,jsonb,bytea,bytea) line 34 at IF
+	PL/pgSQL function public.read_capacity_root(uuid,jsonb,bytea,bytea) line 4 at assignment
+2026-10-17 14:43:41.384 UTC [829] STATEMENT:  -- name: ReadCapacityRoot :one
+	SELECT read_capacity_root($1::uuid,$2::jsonb,$3::bytea,$4::bytea)::jsonb AS result
+	
+2026-10-17 14:44:49.719 UTC [976] ERROR:  capacity revision observation unavailable
+2026-10-17 14:44:49.719 UTC [976] CONTEXT:  PL/pgSQL function public.read_capacity_source_revision(uuid,jsonb) line 10 at RAISE
+2026-10-17 14:44:49.719 UTC [976] STATEMENT:  -- name: ReadCapacitySourceRevision :one
+	SELECT read_capacity_source_revision($1::uuid,$2::jsonb)::bigint AS revision
+	
+2026-10-17 14:44:50.243 UTC [986] ERROR:  connector activated leaf unavailable
+2026-10-17 14:44:50.243 UTC [986] CONTEXT:  PL/pgSQL function public.read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb) line 18 at RAISE
+2026-10-17 14:44:50.243 UTC [986] STATEMENT:  -- name: ReadConnectorActivatedLeaf :one
+	SELECT read_connector_activated_leaf($1::uuid,$2::uuid,$3::text,$4::bytea,$5::jsonb)::jsonb
+	
+2026-10-17 14:44:50.722 UTC [976] ERROR:  capacity recovery unavailable after locks
+2026-10-17 14:44:50.722 UTC [976] CONTEXT:  PL/pgSQL function public.read_capacity_recovery(uuid,timestamp with time zone,timestamp with time zone) line 14 at RAISE
+2026-10-17 14:44:50.722 UTC [976] STATEMENT:  -- name: ReadCapacityRecovery :one
+	SELECT read_capacity_recovery($1::uuid,$2::timestamptz,$3::timestamptz)::jsonb AS recovery
+	
+2026-10-17 14:44:52.732 UTC [976] ERROR:  capacity recovery unavailable after locks
+2026-10-17 14:44:52.732 UTC [976] CONTEXT:  PL/pgSQL function public.read_capacity_recovery(uuid,timestamp with time zone,timestamp with time zone) line 14 at RAISE
+2026-10-17 14:44:52.732 UTC [976] STATEMENT:  -- name: ReadCapacityRecovery :one
+	SELECT read_capacity_recovery($1::uuid,$2::timestamptz,$3::timestamptz)::jsonb AS recovery
+	
+2026-10-17 14:44:54.739 UTC [976] ERROR:  capacity recovery unavailable after locks
+2026-10-17 14:44:54.739 UTC [976] CONTEXT:  PL/pgSQL function public.read_capacity_recovery(uuid,timestamp with time zone,timestamp with time zone) line 14 at RAISE
+2026-10-17 14:44:54.739 UTC [976] STATEMENT:  -- name: ReadCapacityRecovery :one
+	SELECT read_capacity_recovery($1::uuid,$2::timestamptz,$3::timestamptz)::jsonb AS recovery
+	
+2026-10-17 14:44:56.749 UTC [976] ERROR:  capacity recovery unavailable after locks
+2026-10-17 14:44:56.749 UTC [976] CONTEXT:  PL/pgSQL function public.read_capacity_recovery(uuid,timestamp with time zone,timestamp with time zone) line 14 at RAISE
+2026-10-17 14:44:56.749 UTC [976] STATEMENT:  -- name: ReadCapacityRecovery :one
+	SELECT read_capacity_recovery($1::uuid,$2::timestamptz,$3::timestamptz)::jsonb AS recovery
+	
+2026-10-17 14:44:58.757 UTC [976] ERROR:  capacity recovery unavailable after locks
+2026-10-17 14:44:58.757 UTC [976] CONTEXT:  PL/pgSQL function public.read_capacity_recovery(uuid,timestamp with time zone,timestamp with time zone) line 14 at RAISE
+2026-10-17 14:44:58.757 UTC [976] STATEMENT:  -- name: ReadCapacityRecovery :one
+	SELECT read_capacity_recovery($1::uuid,$2::timestamptz,$3::timestamptz)::jsonb AS recovery
+	
