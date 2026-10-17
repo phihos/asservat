@@ -282,11 +282,11 @@ func (c *HubObservationOperationClaim) Observe() (fleet.ClusterObservationResult
 	result, err := c.conversation.ObserveCluster(c.ctx, c.request.Clone())
 	switch {
 	case err != nil:
-		err = &holderStep{"conversation", errors.Join(fleet.ErrUnavailable, err)}
+		err = &stepError{"conversation", errors.Join(fleet.ErrUnavailable, err)}
 	case c.ctx.Err() != nil:
-		err = &holderStep{"claim-deadline", fleet.ErrUnavailable}
+		err = &stepError{"claim-deadline", fleet.ErrUnavailable}
 	case c.entry.stream == nil || !c.entry.stream.completed():
-		err = &holderStep{"stream-incomplete", fleet.ErrUnavailable}
+		err = &stepError{"stream-incomplete", fleet.ErrUnavailable}
 	}
 	c.calls.Done()
 	c.Close()
@@ -296,23 +296,23 @@ func (c *HubObservationOperationClaim) Observe() (fleet.ClusterObservationResult
 		return zero, err
 	}
 	if digestErr != nil || c.parent.Err() != nil || c.entry.holder.root.Err() != nil || !result.Matches(c.request, digest, c.entry.holder.now()) {
-		return zero, &holderStep{"result", fleet.ErrUnavailable}
+		return zero, &stepError{"result", fleet.ErrUnavailable}
 	}
 	return result, nil
 }
 
-// holderStep names the fixed claim step that refused, for operator
+// stepError names the fixed step that refused, for operator
 // diagnostics (FixedStep); it still matches fleet.ErrUnavailable.
-type holderStep struct {
+type stepError struct {
 	step string
 	err  error
 }
 
-func (e *holderStep) Error() string { return e.step }
-func (e *holderStep) Unwrap() error { return e.err }
+func (e *stepError) Error() string { return e.step }
+func (e *stepError) Unwrap() error { return e.err }
 
 // FixedStep appends a nested fixed step, so labels compose across layers.
-func (e *holderStep) FixedStep() string {
+func (e *stepError) FixedStep() string {
 	var inner interface{ FixedStep() string }
 	if errors.As(e.err, &inner) {
 		return e.step + "/" + inner.FixedStep()

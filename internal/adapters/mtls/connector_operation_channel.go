@@ -175,23 +175,23 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 		if c != nil {
 			c.fail()
 		}
-		return zero, value.ErrDenied
+		return zero, answerStep("probe", value.ErrDenied, nil)
 	}
 	r, err := observationOperationRequest(p.Owner.Request, c.now())
 	if err != nil || r.RootID != c.pin.RootID {
 		c.fail()
-		return zero, value.ErrDenied
+		return zero, answerStep("request", value.ErrDenied, err)
 	}
 	call, finish, err := c.enter(ctx, contracts.ClusterObservationProbeFrame, p.Ordinal)
 	if err != nil {
-		return zero, err
+		return zero, answerStep("enter", err, nil)
 	}
 	success := false
 	defer func() { finish(success) }()
 	c.mu.Lock()
 	if c.request.ID != "" && !sameConnectorObservationRequest(c.request, r) {
 		c.mu.Unlock()
-		return zero, value.ErrDenied
+		return zero, answerStep("same-request", value.ErrDenied, nil)
 	}
 	if c.request.ID == "" {
 		c.request = r
@@ -206,17 +206,17 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 	// actual owner/leaf, then independently check current registration and roots.
 	current, err := c.candidates.ReadOwnerObservationCandidates(call)
 	if err != nil || current.Pool != c.pin.Pool || !current.Valid(c.now()) {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("candidates", value.ErrUnavailable, err)
 	}
 	peer := value.PeerCertificate{Binding: c.leaf.Binding, Digest: c.leaf.Digest, NotBefore: c.leaf.NotBefore, NotAfter: c.leaf.NotAfter}
 	owner, err := checkOwnerOperation(call, &c.state, c.verifier, c.registry, current, c.pin, r, peer, p.Owner, p.Ordinal, c.now)
 	if err != nil || owner.owner != c.owner {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("owner", value.ErrUnavailable, err)
 	}
 	c.mu.Lock()
 	if c.origin != nil && !owner.continues(*c.origin) {
 		c.mu.Unlock()
-		return zero, value.ErrUnavailable
+		return zero, answerStep("owner-continues", value.ErrUnavailable, nil)
 	}
 	if c.origin == nil {
 		original := owner
@@ -233,18 +233,18 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 	if p.Ordinal == 1 {
 		operation, err = c.producer.begin(c.ctx, bounded, &c.state, c.leaf, r)
 		if err != nil {
-			return zero, value.ErrUnavailable
+			return zero, answerStep("begin", value.ErrUnavailable, err)
 		}
 		c.mu.Lock()
 		c.operation = operation
 		c.mu.Unlock()
 	}
 	if operation == nil {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("operation", value.ErrUnavailable, nil)
 	}
 	reply, err := operation.read(bounded, p.Ordinal)
 	if err != nil || bounded.Err() != nil {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("read", value.ErrUnavailable, err)
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -252,7 +252,7 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 	currentKeys, stopCurrent := context.WithDeadline(bounded, c.until)
 	defer stopCurrent()
 	if c.closed || c.failed || c.ctx.Err() != nil || !c.now().Before(c.until) || c.producer.credentials.observationKeysCurrent(currentKeys, c.keys) != nil {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("keys", value.ErrUnavailable, nil)
 	}
 	reply.NativeUntil = c.until.UTC().Format(time.RFC3339Nano)
 	reply.SourceFreshUntil = identity.Earlier(ownerObservationTime(reply.SourceFreshUntil), c.until).UTC().Format(time.RFC3339Nano)

@@ -380,3 +380,12 @@ regional slot.
     so registration-3 often stops between the reads (value check or SQL);
     registration-1 fails after both reads. The registry now names each
     check, distinguishing expired values from mismatches.
+  - [CI run 6](../../test/results/adr197-continuation-ci-6/native-continuation-1/context-storage-environment.json)
+    (run 39035890980): the hub's refusals are transport reads over the
+    standby (`registration-1/first-read`, `registration-3/last-read`,
+    `exchange`, `receipt`), not registry checks. About nine of the
+    region's fourteen failed serves ended before its native open, so the
+    region refused while answering the first probe, which first re-reads
+    the hub's owner candidates and verifies the hub owner's proof through
+    its own lifecycle reads. The region's probe answer, producer setup and
+    serve loop now carry fixed steps, and its standby log prints the chain.

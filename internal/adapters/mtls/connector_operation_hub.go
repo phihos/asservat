@@ -197,6 +197,12 @@ func (h *HubConnectorObservationOperation) ObserveClusterOperation(ctx context.C
 	return result, nil
 }
 
+// answerStep labels a refusal with its fixed step; the result still matches
+// sentinel, and cause (when set) for any nested step and closed cause.
+func answerStep(step string, sentinel, cause error) error {
+	return &operationStep{step, errors.Join(sentinel, cause)}
+}
+
 // operationStep names the fixed step at which a regional operation was
 // refused, for operator diagnostics (FixedStep); it wraps the original error.
 type operationStep struct {

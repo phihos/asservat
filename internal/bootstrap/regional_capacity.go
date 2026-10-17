@@ -206,7 +206,12 @@ func (r *regionalCapacity) standbys(ctx context.Context, client *mtls.ConnectorO
 		if opened {
 			stage = "serve"
 		}
-		if cause := stage + " (" + regionalCause(err) + ")"; err != nil && cause != last {
+		cause := stage + " (" + regionalCause(err) + ")"
+		var step interface{ FixedStep() string }
+		if errors.As(err, &step) {
+			cause = stage + "/" + regionalOutcome(err)
+		}
+		if err != nil && cause != last {
 			fmt.Fprintln(os.Stderr, "regional capacity standby: "+cause)
 			last = cause
 		}

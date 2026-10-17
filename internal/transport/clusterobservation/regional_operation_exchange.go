@@ -2,6 +2,7 @@ package clusterobservation
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
@@ -35,16 +36,16 @@ func ServeRegionalObservationOperation(ctx context.Context, connection regionalO
 	}
 	defer func() {
 		if connection.Close() != nil {
-			resultErr = fleet.ErrUnavailable
+			resultErr = &stepError{"close", fleet.ErrUnavailable}
 		}
 	}()
 	if ctx == nil || ctx.Err() != nil || now == nil || connection.Context() == nil || connection.Context().Err() != nil {
-		return fleet.ErrUnavailable
+		return &stepError{"connection", fleet.ErrUnavailable}
 	}
 	hello := connection.Hello()
 	end, finite := connection.Context().Deadline()
 	if !finite || !now().Before(end) || end.After(now().Add(30*time.Second)) || hello.Format != contracts.ClusterObservationOperationExchangeFormat || !authorization.UUID(hello.ExchangeID) || !authorization.UUID(hello.RootID) || !authorization.UUID(hello.ClusterID) {
-		return fleet.ErrInvalid
+		return &stepError{"hello", fleet.ErrInvalid}
 	}
 	call, cancel := context.WithDeadline(ctx, end)
 	defer cancel()
@@ -70,7 +71,7 @@ func ServeRegionalObservationOperation(ctx context.Context, connection regionalO
 		if e != nil || bounded.Err() != nil || !now().Before(until) || order.admit(frame.Kind, false, len(frame.Payload)) != nil {
 			clear(frame.Payload)
 			narrow()
-			return fleet.ErrUnavailable
+			return &stepError{"receive", errors.Join(fleet.ErrUnavailable, e)}
 		}
 		var output contracts.ClusterObservationFrame
 		switch frame.Kind {
@@ -78,7 +79,7 @@ func ServeRegionalObservationOperation(ctx context.Context, connection regionalO
 			probe, e := contracts.DecodeClusterObservationOperationProbe(frame.Payload)
 			ordinal++
 			if e != nil || probe.Format != contracts.ClusterObservationOperationExchangeFormat || probe.ExchangeID != hello.ExchangeID || probe.Ordinal != ordinal || probe.Owner.Request.Format != contracts.OwnerObservationOperationFormat || probe.Owner.Request.RootID != hello.RootID || !authorization.UUID(probe.Owner.Request.ID) || !authorization.UUID(probe.Owner.Request.Challenge) || !identity.Fresh(readTime(probe.Owner.Request.RequestedAt), readTime(probe.Owner.Request.NotAfter), now(), 5*time.Second) || original.ID != "" && probe.Owner.Request != original {
-				err = fleet.ErrUnavailable
+				err = &stepError{"probe", fleet.ErrUnavailable}
 				break
 			}
 			if original.ID == "" {
@@ -89,7 +90,7 @@ func ServeRegionalObservationOperation(ctx context.Context, connection regionalO
 			proof, e := connection.AnswerConnectorObservation(proofCall, probe)
 			stopProof()
 			if e != nil || proof.Ordinal != ordinal || proof.Request != original {
-				err = fleet.ErrUnavailable
+				err = &stepError{"answer", errors.Join(fleet.ErrUnavailable, e)}
 				break
 			}
 			until = identity.Earlier(until, identity.Earlier(readTime(proof.NativeUntil), identity.Earlier(readTime(proof.SourceFreshUntil), readTime(proof.WorkloadFreshUntil))))
@@ -99,12 +100,12 @@ func ServeRegionalObservationOperation(ctx context.Context, connection regionalO
 			wire, e := contracts.DecodeClusterObservationRequest(frame.Payload)
 			request, digest, pe := ParseRequest(wire, now())
 			if e != nil || pe != nil || request.RootID != hello.RootID || request.ClusterID != hello.ClusterID || request.ID != original.ID || request.Challenge != original.Challenge || !request.RequestedAt.Equal(readTime(original.RequestedAt)) || !request.NotAfter.Equal(readTime(original.NotAfter)) {
-				err = fleet.ErrUnavailable
+				err = &stepError{"read-request", fleet.ErrUnavailable}
 				break
 			}
 			result, e := connection.ObserveCluster(bounded, request)
 			if e != nil || !result.Matches(request, digest, now()) {
-				err = fleet.ErrUnavailable
+				err = &stepError{"observe", errors.Join(fleet.ErrUnavailable, e)}
 				break
 			}
 			until = identity.Earlier(until, result.Interval.FreshUntil)
@@ -113,35 +114,42 @@ func ServeRegionalObservationOperation(ctx context.Context, connection regionalO
 		case contracts.ClusterObservationReceiptFrame:
 			receipt, e := contracts.DecodeClusterObservationReceipt(frame.Payload)
 			if e != nil || !order.complete() {
-				err = fleet.ErrUnavailable
+				err = &stepError{"receipt-decode", fleet.ErrUnavailable}
 				break
 			}
 			err = connection.AcceptObservationReceipt(bounded, receipt)
 			if err == nil {
 				err = connection.FinishObservation(bounded)
 			}
+			if err != nil {
+				err = &stepError{"receipt", errors.Join(fleet.ErrUnavailable, err)}
+			}
 		default:
-			err = fleet.ErrUnavailable
+			err = &stepError{"frame", fleet.ErrUnavailable}
 		}
 		clear(frame.Payload)
 		if err == nil && output.Kind != 0 {
 			if order.admit(output.Kind, true, len(output.Payload)) != nil || bounded.Err() != nil || !now().Before(until) {
-				err = fleet.ErrUnavailable
+				err = &stepError{"send-window", fleet.ErrUnavailable}
 			} else {
 				write, stopWrite := context.WithDeadline(bounded, until)
-				err = connection.Send(write, output)
+				if err = connection.Send(write, output); err != nil {
+					err = &stepError{"send", errors.Join(fleet.ErrUnavailable, err)}
+				}
 				stopWrite()
 			}
 		}
 		clear(output.Payload)
-		failed := err != nil || bounded.Err() != nil || !now().Before(until)
+		if err == nil && (bounded.Err() != nil || !now().Before(until)) {
+			err = &stepError{"frame-deadline", fleet.ErrUnavailable}
+		}
 		narrow()
-		if failed {
-			return fleet.ErrUnavailable
+		if err != nil {
+			return err
 		}
 	}
 	if call.Err() != nil || !now().Before(until) {
-		return fleet.ErrUnavailable
+		return &stepError{"deadline", fleet.ErrUnavailable}
 	}
 	return nil
 }

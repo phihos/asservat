@@ -56,16 +56,16 @@ type connectorProducedOperation struct {
 // channel must Close this operation on any later frame/delivery failure.
 func (p *ConnectorObservationOperationProducer) begin(streamRoot, call context.Context, state *tls.ConnectionState, leaf value.ConnectorCredentialCertificate, request value.OwnerObservationRequest) (*connectorProducedOperation, error) {
 	if p == nil || streamRoot == nil || call == nil || streamRoot.Err() != nil || call.Err() != nil || !request.Valid(p.now()) || request.RootID != p.pin.Profile.RootID || !leaf.Valid(p.now()) || leaf.Usage != "client" || leaf.Binding != p.pin.Profile.Binding {
-		return nil, value.ErrInvalid
+		return nil, answerStep("request", value.ErrInvalid, nil)
 	}
 	streamEnd, finite := streamRoot.Deadline()
 	callEnd, callFinite := call.Deadline()
 	if !finite || !callFinite || !p.now().Before(streamEnd) || streamEnd.After(p.now().Add(30*time.Second)) {
-		return nil, value.ErrInvalid
+		return nil, answerStep("stream-deadline", value.ErrInvalid, nil)
 	}
 	channel, err := observationOperationConnection(state, request)
 	if err != nil {
-		return nil, err
+		return nil, answerStep("channel", err, nil)
 	}
 	until := identity.Earlier(request.NotAfter, identity.Earlier(streamEnd, identity.Earlier(callEnd, leaf.NotAfter)))
 	root, cancel := context.WithDeadline(streamRoot, until)
@@ -76,7 +76,7 @@ func (p *ConnectorObservationOperationProducer) begin(streamRoot, call context.C
 		cancel()
 		joinCall()
 		joinProcess()
-		return nil, value.ErrUnavailable
+		return nil, answerStep("keys", value.ErrUnavailable, err)
 	}
 	until = identity.Earlier(until, keys.runUntil)
 	bounded, stopBound := context.WithDeadline(root, until)
@@ -89,7 +89,7 @@ func (p *ConnectorObservationOperationProducer) begin(streamRoot, call context.C
 			native.Close()
 		}
 		joinProcess()
-		return nil, value.ErrUnavailable
+		return nil, answerStep("native", value.ErrUnavailable, err)
 	}
 	return &connectorProducedOperation{producer: p, root: bounded, cancel: func() { cancel(); stopBound() }, joinProcess: joinProcess, native: native, keys: keys, request: request, channel: channel, id: uuid.NewString(), until: until}, nil
 }
