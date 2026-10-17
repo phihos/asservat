@@ -105,7 +105,10 @@ type operationReceiverFixture struct {
 func newOperationReceiverFixture(t *testing.T, mode string) *operationReceiverFixture {
 	t.Helper()
 	base, _, unused := newRuntimeFixture(t)
-	_ = unused.Close()
+	// Hold the pool's Port until the test ends: closing it here let the next
+	// test server reuse that port as NativePort, which makes the pool invalid
+	// (the flaky "invalid signed control work" fixture failures).
+	t.Cleanup(func() { _ = unused.Close() })
 	root, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	f := &operationReceiverFixture{root: root, cancel: cancel, base: base, mode: mode, regionalDone: make(chan error, 1)}
 	var handler *wire.HubObservationOperationHandler

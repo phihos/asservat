@@ -250,7 +250,10 @@ func TestRegionalOperationActualFramedCoordinator(t *testing.T) {
 	for _, mode := range []string{"joined", "owner-final", "regional-final", "sql-final", "cancel-final"} {
 		t.Run(mode, func(t *testing.T) {
 			base, _, unused := newRuntimeFixture(t)
-			_ = unused.Close()
+			// Hold the pool's Port until the test ends: closing it here let the next
+			// test server reuse that port as NativePort, which makes the pool invalid
+			// (the flaky "invalid signed control work" fixture failures).
+			t.Cleanup(func() { _ = unused.Close() })
 			root, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			var handler *wire.HubObservationOperationHandler

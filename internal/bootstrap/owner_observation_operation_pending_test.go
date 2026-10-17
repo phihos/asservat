@@ -56,7 +56,10 @@ type pendingFixture struct {
 func newPendingFixture(t *testing.T) *pendingFixture {
 	t.Helper()
 	base, _, unused := newRuntimeFixture(t)
-	_ = unused.Close()
+	// Hold the pool's Port until the test ends: closing it here let the next
+	// test server reuse that port as NativePort, which makes the pool invalid
+	// (the flaky "invalid signed control work" fixture failures).
+	t.Cleanup(func() { _ = unused.Close() })
 	base.configuration.Pool.NativePort = 9444
 	base.configuration.Pool.NativeBootstrap = value.OwnerBootstrapProfile
 	base.configuration.Pool.NativeCandidateLimit = 1024
