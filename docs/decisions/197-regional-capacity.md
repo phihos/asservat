@@ -496,3 +496,17 @@ regional slot.
     phase (`recovery`, `revision`, `protection`, `read`, `input`,
     `accept`, `result`) and the hub-worker logs each change of outcome.
     So far two of four runs on the read-first path pass.
+  - [CI runs 19a/19b](../../test/results/adr197-continuation-ci-19b/native-continuation-1/context-storage-environment.json)
+    (39060582454, 39060589794): 19a passed, so three of six read-first
+    runs pass. In 19b the source loop recovered after one `accept`
+    refusal and the regional workload reached `ready_at`, but its binding
+    went stale: after the first successful reconciliation each attempt
+    stopped at `compose/permission-scope (not-allocated)`. The capacity
+    scope reader returns only maintainer bases seen in the stream's
+    current sequence whose live assignment has an acknowledged
+    activation audit, so the regional binding dropped out of a later
+    permission batch or was re-created with an unacknowledged audit. The
+    hub-worker discarded both the permission reconciler's and the
+    authority publisher's errors. Both are now logged per change, and on
+    timeout the test prints each basis's sequence, live and retired
+    assignments and unacknowledged audits.

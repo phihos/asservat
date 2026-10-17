@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"time"
@@ -245,7 +246,11 @@ func (p *permissionWorker) run(ctx context.Context) error {
 	// A failed epoch retries after the 30-second SQL controller lease, so a
 	// new epoch is not refused while the old lease is still live.
 	for ctx.Err() == nil {
-		_ = p.reconciler.Run(ctx)
+		// A stopped epoch leaves capacity scopes stale for 31 s; say why
+		// (ADR-197 CI continuation run 19b).
+		if err := p.reconciler.Run(ctx); ctx.Err() == nil {
+			fmt.Fprintln(os.Stderr, "permission reconciler stopped: "+regionalOutcome(err))
+		}
 		if !sleepContext(ctx, 31*time.Second) {
 			break
 		}
@@ -260,13 +265,17 @@ func (p *permissionWorker) publish(ctx context.Context) {
 	// A lease admits one provider audit invocation. With retention the
 	// leases alternate between authority and checkpoint acceptance records.
 	turn := 0
+	// One line per change of the authority publisher's outcome: an
+	// unacknowledged activation audit hides its scope from capacity.
+	last := "ok"
 	for ctx.Err() == nil {
 		if lease, err := p.admission.WaitAuthorityAudit(ctx); err == nil {
 			if lease.AwaitFleetObservation() == nil {
 				if p.retention != nil && turn%2 == 1 {
 					_ = p.retention.acceptance.Publish(lease.Context(), 1)
-				} else {
-					_ = p.publisher.PublishAuthority(lease.Context())
+				} else if outcome := regionalOutcome(p.publisher.PublishAuthority(lease.Context())); outcome != last && ctx.Err() == nil {
+					last = outcome
+					fmt.Fprintln(os.Stderr, "authority audit publish: "+outcome)
 				}
 				turn++
 			}

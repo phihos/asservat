@@ -617,6 +617,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		if time.Now().After(until) {
 			installedProcessDiagnostics(t, ctx, hub, namespace, prefix+"-worker", prefix+"-owner", kube.FederationWorkloadName(installation))
 			regionalLogs(t, ctx, region)
+			permissionScopeDiagnostics(t, ctx, admin, root)
 			t.Fatal("regional workload did not reach ready_at with a fresh binding", e, ready, fresh)
 		}
 	}
@@ -625,4 +626,34 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		t.Fatal("pool revision chain", revisions, err)
 	}
 	t.Log("regional workload enrolled through v2 to ready_at with a fresh binding; the pool extended once")
+}
+
+// permissionScopeDiagnostics shows why a maintainer scope may be missing from
+// the capacity scope reader: a basis not seen in the current stream sequence,
+// assignment churn, or unacknowledged activation audits (ADR-197 run 19b).
+func permissionScopeDiagnostics(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string) {
+	t.Helper()
+	rows, err := admin.Query(ctx, `SELECT b.basis_key,b.resource_version,b.generation,b.seen_sequence,s.sequence,
+ count(a.id) FILTER (WHERE a.retired_at IS NULL),count(a.id) FILTER (WHERE a.retired_at IS NOT NULL),
+ count(a.id) FILTER (WHERE a.retired_at IS NULL AND au.acknowledged_at IS NULL)
+ FROM permission_basis b JOIN permission_stream s ON s.id=b.stream_id
+ LEFT JOIN permission_assignment a ON a.stream_id=b.stream_id AND a.basis_key=b.basis_key
+ LEFT JOIN authority_audit au ON au.id=a.activation_audit_id
+ WHERE b.stream_id=$1 GROUP BY b.basis_key,b.resource_version,b.generation,b.seen_sequence,s.sequence ORDER BY b.basis_key`, root)
+	if err != nil {
+		t.Log("diagnostics: permission bases", err)
+		return
+	}
+	for rows.Next() {
+		var key, version string
+		var generation, seen, sequence, live, retired, unacknowledged int64
+		if rows.Scan(&key, &version, &generation, &seen, &sequence, &live, &retired, &unacknowledged) == nil {
+			t.Logf("diagnostics: basis %s rv=%s gen=%d seen=%d stream=%d live=%d retired=%d unacknowledged=%d", key, version, generation, seen, sequence, live, retired, unacknowledged)
+		}
+	}
+	rows.Close()
+	var pending int64
+	if admin.QueryRow(ctx, `SELECT count(*) FROM authority_audit WHERE stream_id=$1 AND acknowledged_at IS NULL`, root).Scan(&pending) == nil {
+		t.Logf("diagnostics: %d unacknowledged authority audits", pending)
+	}
 }
