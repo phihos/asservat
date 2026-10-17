@@ -510,3 +510,16 @@ regional slot.
     authority publisher's errors. Both are now logged per change, and on
     timeout the test prints each basis's sequence, live and retired
     assignments and unacknowledged audits.
+  - [CI runs 20a–20c](../../test/results/adr197-continuation-ci-20c/native-continuation-1/context-storage-environment.json)
+    (39062760404, 39062766911, 39062774420): 20b passed (four of nine
+    read-first runs). The new diagnostics rule out the permission theory:
+    in 20a and 20c the only permission basis is current, live and
+    acknowledged. Both reached `ready_at`, and then the hub-worker's
+    regional observations went silent for the rest of the five-minute
+    wait, so the binding (fresh for at most five seconds per refresh) was
+    never refreshed. The workload loop is shared by the hub and regional
+    clusters, and the hub cluster's local outcomes were not logged, so a
+    stuck step on either cluster stops both. The loop now reports a step
+    still running after two source intervals with its cluster and stage,
+    and the hub cluster's observations and outcomes are logged as
+    `capacity local ...`.

@@ -27,8 +27,8 @@ type capacityRemoteObservation struct {
 	rootID, clusterID string
 	now               func() time.Time
 	// diagnose logs one closed purpose and outcome per change, with its
-	// elapsed time, for the regional v2 path (ADR-197); never remote text.
-	diagnose bool
+	// elapsed time, labelled "regional" or "local" (ADR-197); never remote text.
+	diagnose string
 	mu       sync.Mutex
 	last     string
 	workload string
@@ -53,7 +53,7 @@ func (s *capacityRemoteObservation) reportWorkload(err error, elapsed time.Durat
 	defer s.mu.Unlock()
 	if outcome := regionalOutcome(err); outcome != s.workload {
 		s.workload = outcome
-		fmt.Fprintf(os.Stderr, "capacity regional workload: %s after %s\n", outcome, elapsed.Round(10*time.Millisecond))
+		fmt.Fprintf(os.Stderr, "capacity %s workload: %s after %s\n", s.diagnose, outcome, elapsed.Round(10*time.Millisecond))
 	}
 }
 
@@ -100,11 +100,11 @@ func (s *capacityRemoteObservation) observe(ctx context.Context, r fleet.Cluster
 	if err == nil {
 		result, err = capacityCheckedObservation(r, result, until, s.now())
 	}
-	if s.diagnose {
+	if s.diagnose != "" {
 		s.mu.Lock()
 		if line := string(r.Purpose) + ": " + regionalOutcome(err); line != s.last {
 			s.last = line
-			fmt.Fprintf(os.Stderr, "capacity regional observation %s after %s\n", line, s.now().Sub(started).Round(10*time.Millisecond))
+			fmt.Fprintf(os.Stderr, "capacity %s observation %s after %s\n", s.diagnose, line, s.now().Sub(started).Round(10*time.Millisecond))
 		}
 		s.mu.Unlock()
 	}

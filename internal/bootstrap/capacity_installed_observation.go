@@ -84,7 +84,8 @@ func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, 
 		if e != nil {
 			return nil, nil, e
 		}
-		out = append(out, app.CapacityClusterReaders{ClusterID: cluster.ClusterID, Workloads: read, Guard: read})
+		read.diagnose = "local"
+		out = append(out, app.CapacityClusterReaders{ClusterID: cluster.ClusterID, Workloads: read, Guard: read, Report: read.reportWorkload})
 	}
 	// ADR-197: each regional qualification is observed over v2 through the
 	// owner holding its standby. Guarded makes ReconcileWorkload use one
@@ -132,7 +133,7 @@ func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, 
 			if e != nil {
 				return nil, nil, e
 			}
-			read.diagnose = true
+			read.diagnose = "regional"
 			out = append(out, app.CapacityClusterReaders{ClusterID: q.ClusterID, Workloads: read, Guard: read, Guarded: read, Pace: 2 * time.Second, Report: read.reportWorkload})
 		}
 	}

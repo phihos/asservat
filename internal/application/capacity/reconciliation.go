@@ -22,7 +22,12 @@ type CapacityReconciler struct {
 	// SourceReport, when set, receives each source observation's outcome
 	// (nil on success) from the single source loop. Diagnostics only.
 	SourceReport func(error)
-	running      atomic.Bool
+	// Stalled, when set, is told once when one workload-loop step is still
+	// running two source intervals after it started: the loop is shared by
+	// all clusters, so one stuck step starves every other cluster. ADR-197
+	// runs 20a/20c went silent after enrolling. Diagnostics only.
+	Stalled func(clusterID, stage string)
+	running atomic.Bool
 }
 
 // CapacitySourceInvocation is only the existing source invocation boundary.
@@ -197,6 +202,8 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 		cursors := make([]capacityDiscoveryCursor, len(s.Clusters))
 		ended := make([]time.Time, len(s.Clusters))
 		next := 0
+		var stage atomic.Pointer[string]
+		mark := func(v string) { stage.Store(&v) }
 		capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
 			i := next
 			next = (next + 1) % len(s.Clusters)
@@ -205,6 +212,12 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 					return
 				}
 				defer func() { ended[i] = s.Work.Now() }()
+			}
+			mark("discover")
+			if s.Stalled != nil {
+				id := s.Clusters[i].ClusterID
+				t := time.AfterFunc(2*CapacitySourceInterval, func() { s.Stalled(id, *stage.Load()) })
+				defer t.Stop()
 			}
 			ns, candidate, found, err := cursors[i].next(call, s.Clusters[i].Workloads)
 			if err != nil || !found || call.Err() != nil {
@@ -220,12 +233,14 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 				// two-to-three-second exchange never spends a source snapshot's
 				// remaining freshness. Composition still intersects every
 				// original interval, and every effect follows every check.
+				mark("guarded-read")
 				facts, err := s.Work.ReadGuardedCandidate(call, s.Clusters[i], ns, candidate)
 				if err == nil {
 					err = capacityStage("source", cfg.ErrUnavailable)
 					if original, v, ok := current.read(s.Work.Now()); ok {
 						until, _ := call.Deadline()
 						live, end := context.WithDeadline(original, until)
+						mark("guarded-reconcile")
 						err = s.Work.ReconcileGuardedWorkload(live, v, s.Clusters[i], ns, candidate, facts)
 						end()
 					}
@@ -235,14 +250,20 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 				}
 				return
 			}
-			if original, v, ok := current.read(s.Work.Now()); ok {
-				until, _ := call.Deadline()
-				live, end := context.WithDeadline(original, until)
-				defer end()
-				err := s.Work.ReconcileWorkload(live, v, s.Clusters[i], ns, candidate)
+			original, v, ok := current.read(s.Work.Now())
+			if !ok {
 				if report != nil {
-					report(err, s.Work.Now().Sub(started))
+					report(capacityStage("source", cfg.ErrUnavailable), s.Work.Now().Sub(started))
 				}
+				return
+			}
+			until, _ := call.Deadline()
+			live, end := context.WithDeadline(original, until)
+			defer end()
+			mark("reconcile")
+			err = s.Work.ReconcileWorkload(live, v, s.Clusters[i], ns, candidate)
+			if report != nil {
+				report(err, s.Work.Now().Sub(started))
 			}
 		})
 	}()

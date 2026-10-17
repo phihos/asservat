@@ -292,7 +292,10 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 	}
 	d.reconciler = &app.CapacityReconciler{Source: &app.CapacitySourceObserver{RootID: c.PermissionRootID, InstallationID: c.InstallationID, QualificationID: q.ID, QualificationDigest: q.Digest, Source: source, Protection: guard, Recovery: journal, Journal: journal, Now: time.Now},
 		Work: &app.CapacityWorkReconciler{Qualification: q, Recovery: journal, Permissions: permissions, Processing: processing, Root: &app.RootBackingCoordinator{Store: general, Capture: capture, Now: time.Now}, Enrollment: &app.EnrollmentCoordinator{Store: enroll, Capture: captureEnroll, Accounts: accounts, Now: time.Now}, Bindings: enroll, Now: time.Now, Regional: regional}, Clusters: clusters,
-		SourceReport: capacitySourceReporter()}
+		SourceReport: capacitySourceReporter(),
+		Stalled: func(cluster, stage string) {
+			fmt.Fprintf(os.Stderr, "capacity workload loop stalled: cluster %s in %s for over %s\n", cluster, stage, 2*app.CapacitySourceInterval)
+		}}
 	d.regional = regional
 	complete = true
 	return d, nil
