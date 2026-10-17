@@ -119,6 +119,21 @@ describe('browser session lifecycle', () => {
     expect(fetcher).toHaveBeenCalledTimes(calls);
   });
 
+  it('reports expiry when the refresh timer fires at the deadline before the expiry timer', async () => {
+    const until = Date.now() + 1_800;
+    fetcher.mockResolvedValueOnce(token()).mockResolvedValueOnce(json(session({ expires_at: new Date(until).toISOString() })));
+    await controller.resume();
+    expect(controller.snapshot().phase).toBe('active');
+    // Both timers are due at the deadline; on a loaded browser the refresh can
+    // run first. Its attempt is already out of time and must not read as an
+    // unavailable session.
+    fetcher.mockImplementation((_, init) => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))));
+    vi.setSystemTime(until);
+    const pending = controller.resume();
+    await vi.advanceTimersByTimeAsync(0); await pending;
+    expect(controller.snapshot()).toEqual({ phase: 'signedOut', reason: 'expired' });
+  });
+
   it('cannot extend a fixed deadline for the same user', async () => {
     const deadline = Date.now() + 2_000;
     fetcher.mockResolvedValueOnce(token()).mockResolvedValueOnce(json(session({ expires_at: new Date(deadline).toISOString() })));

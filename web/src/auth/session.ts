@@ -53,6 +53,9 @@ export class BrowserSession {
     if (this.disposed || this.logoutPending) return Promise.resolve();
     if (this.pending) return this.pending;
     const previous = this.state.phase === 'active' ? this.state.session : undefined;
+    // The refresh timer can run at the deadline before the expiry timer; a
+    // session past its fixed deadline has expired, not become unavailable.
+    if (previous && Date.parse(previous.expires_at) <= Date.now()) { this.expire(); return Promise.resolve(); }
     const generation = ++this.generation;
     const request = new AbortController();
     this.request = request;
@@ -81,6 +84,7 @@ export class BrowserSession {
         this.scheduleRefresh(until);
       } catch (error) {
         if (!this.current(generation)) return;
+        if (previous && Date.parse(previous.expires_at) <= Date.now()) { this.expire(); return; }
         const denied = error instanceof SessionFailure && [401, 403].includes(error.status);
         if (!denied && (error instanceof SessionFailure && error.busy || observedBusy && request.signal.aborted)) {
           if (!previous) this.publish({ phase: 'unavailable' });
