@@ -8,17 +8,19 @@ Profiles are first-class evidence: they can be selected in a recipe, triggered a
 | --- | --- | --- |
 | Go pprof | CPU, heap, allocations, goroutines, block, mutex, threadcreate; binary pprof | Application already exposes an approved pprof endpoint or writes profiles. Block/mutex sampling must already be enabled by the application. |
 | Go execution trace | Native runtime trace, separate from pprof | Approved trace endpoint; short duration; higher data volume and overhead |
-| JVM | JFR; optional async-profiler CPU/allocation/lock/wall profiles | Qualified JDK attach/recording permissions; optional profiler installation is operator-managed |
-| .NET | EventPipe `.nettrace`, CPU sampling and selected runtime events | Diagnostic socket and matching runtime tooling; no assumption of direct pprof compatibility |
-| Python | py-spy samples in supported native/Speedscope formats | Qualified ptrace/permission/runtime support; stack sampling is not heap profiling |
-| Node.js | V8 CPU profile; separately enabled heap sampling | Existing diagnostics/inspector adapter or generated profile file; no public inspector exposure |
-| Native/eBPF | Qualified CPU/off-CPU sampled stacks | Approved pinned profiling gadget, kernel/perf permissions and exact symbols |
+| Any runtime (eBPF CPU sampler) | CPU sampled stacks for native code, Go, JVM (HotSpot), Python, Node.js (V8), .NET, Ruby, PHP, Perl and BEAM; pprof | Node collector's pinned OpenTelemetry eBPF profiler ([ADR-201](../docs/decisions/201-ebpf-cpu-profiles.md)); kernel 5.10+; nothing attached to the target; only the selected pod's samples leave the collector; native frames need symbols |
+| JVM | JFR started through `jcmd` for allocation and lock samples; async-profiler only as an explicit opt-in | Qualified JDK attach/recording permissions; async-profiler loads a native agent into the target and is operator-managed |
+| .NET | EventPipe `.nettrace` allocation and selected runtime events | Diagnostic socket and matching runtime tooling; no assumption of direct pprof compatibility |
+| Python | No agent-free heap profile; py-spy or `tracemalloc` only as explicit opt-ins | They attach to or modify the target; CPU comes from the eBPF sampler |
+| Node.js | Heap sampling through the inspector, only as an explicit opt-in | No public inspector exposure; CPU comes from the eBPF sampler |
 
 Go's pprof HTTP API distinguishes binary profiles, optional GC and duration/delta parameters; some profile types require application sampling setup. [Go pprof HTTP API](https://pkg.go.dev/net/http/pprof), [Go diagnostics](https://go.dev/doc/diagnostics). JFR/async-profiler and EventPipe have their own formats and semantics. [async-profiler modes](https://github.com/async-profiler/async-profiler/blob/master/docs/ProfilingModes.md), [.NET trace tool](https://learn.microsoft.com/en-us/dotnet/core/diagnostics/dotnet-trace), [Node CPU profiling](https://nodejs.org/api/cli.html#--cpu-prof).
 
 ## REQ-PRF-001 — Typed profile collection
 
 The `profile` action MUST specify runtime, profile type, acquisition mode (`snapshot`, `cumulative`, `delta` or `interval`), named acquisition source, duration where meaningful, and the ordinary action byte/deadline limits. Go pprof CPU and heap collection are part of the first production scope; other Go types are available when their application prerequisites are satisfied. Additional runtime formats are independently qualified capability packs.
+
+CPU profiles for runtimes without an approved pprof endpoint come from the node collector's eBPF sampler ([ADR-201](../docs/decisions/201-ebpf-cpu-profiles.md)). It needs no endpoint and attaches nothing to the target. It samples host-wide only for the bounded session and MUST keep only samples whose process belongs to the selected pod, verified by pod, cgroup and process-start identity; all other samples are discarded in collector memory before encoding, encryption or output, and coverage reports dropped and unattributed samples. Output is pprof with build IDs for native mappings; missing symbols are reported. Allocation, lock and heap profiles remain per-runtime adapters.
 
 Acquire through an administrator-approved endpoint profile or a qualified runtime adapter. Resolve endpoints to the selected pod identity; support pod IP and loopback within the target netns. A localhost endpoint MUST NOT resolve to the collector's own loopback. Do not accept arbitrary URLs, redirects, ports, headers or query parameters from an MCP client. TLS/auth credentials come from named profiles and are not captured as evidence.
 
