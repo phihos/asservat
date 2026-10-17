@@ -46,21 +46,34 @@ Sources: the [profiler](https://github.com/open-telemetry/opentelemetry-ebpf-pro
    weekly tag and qualified per supported kernel. It needs no endpoint and
    attaches nothing to the target, so the workload keeps Pod Security
    `restricted` and needs no setup.
-2. **Pod scope before output.** The session samples host-wide for its bounded
-   duration only. The collector keeps samples whose process belongs to the
-   selected pod (verified pod, cgroup and process-start identity) and discards
-   all others in memory, before encoding, encryption or any output. Coverage
-   reports dropped and unattributed samples. A cgroup filter contributed
-   upstream would move this into the kernel; Asservat does not depend on a fork.
+2. **Pod scope, as for syscall traces.** The evidence scope is the whole
+   selected pod: no container selector and no host-wide fallback
+   ([syscalls](../../specs/syscalls.md)). The kernel program samples host-wide
+   during the bounded session only because the profiler has no cgroup filter.
+   The collector attributes each sample by verified pod, cgroup, process-start
+   and node-boot identity and fails closed: a sample whose membership is
+   uncertain is dropped and counted as `unattributedSamples`. Samples of other
+   processes are discarded in collector memory before encoding, encryption or
+   output, are never written to disk, logs or metrics, and are not counted, so
+   no other workload's CPU activity is disclosed. The collector suppresses its
+   own core dumps. A cgroup filter contributed upstream would move this into the
+   kernel; Asservat does not depend on a fork.
 3. **Output is pprof** built by the collector's own reporter, with build IDs for
    native mappings, so developers can symbolize locally. Missing symbols are
    reported, as for cores.
-4. **Allocation, lock and heap profiles stay per runtime:** Go pprof endpoints
+4. **Contracts.** The `profile` action accepts source kind `ebpfSampler` with
+   `runtime: any` and `type: cpu`, and names no endpoint profile. Profile
+   metadata gains `runtime: any`, `detectedRuntimes` (including Ruby, PHP, Perl
+   and BEAM) and an `ebpfSampler` acquisition with `unattributedSamples`
+   ([action](../../specs/contracts/action.schema.json) and
+   [profile](../../specs/contracts/profile.schema.json) schemas, example
+   `examples/profile-metadata-ebpf.json`).
+5. **Allocation, lock and heap profiles stay per runtime:** Go pprof endpoints
    (first production scope, unchanged) and JFR started through `jcmd` for the
    JVM. async-profiler, py-spy, Python `tracemalloc` and Node heap sampling
    modify or attach to the target; they are explicit opt-ins under REQ-PRF-002's
    approved external-profiler parameters, never defaults.
-5. **Approval and limits are unchanged.** The eBPF session is live profiling,
+6. **Approval and limits are unchanged.** The eBPF session is live profiling,
    classified intrusive for approval and budget, with REQ-PRF-002's duration and
    output limits. Only one Asservat eBPF session runs per node at a time.
 
@@ -72,7 +85,8 @@ Sources: the [profiler](https://github.com/open-telemetry/opentelemetry-ebpf-pro
   pods' stacks in collector memory. Overhead must be measured in qualification;
   the upstream figure is not an Asservat claim.
 - The binary embeds the GPL-2.0 eBPF objects; distribution must ship their
-  licence and point to their source.
+  licence and point to their source. The dependency is recorded in
+  [technology](../technology.md) and [build or reuse](../architecture/build-or-reuse.md).
 - The unstable API means pinned versions and an adapter test per upgrade.
 - An ongoing (continuous) eBPF recorder is possible later but needs its own
   lifecycle and accounting under the action-lifecycle rules.

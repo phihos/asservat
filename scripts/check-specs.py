@@ -1635,6 +1635,19 @@ def main() -> None:
     rejects(examples["recipe-pprof.yaml"], "recipe", lambda d: d["spec"]["actions"][0]["parameters"].pop("duration"))
     rejects(examples["recipe-pprof.yaml"], "recipe", lambda d: d["spec"]["actions"][0]["parameters"].update({"url": "http://unapproved.invalid"}))
     rejects(examples["recipe-pprof-template.yaml"], "recipe", lambda d: d["spec"]["endpointBindings"][0].update({"url": "http://unapproved.invalid"}))
+    # ADR-201: the eBPF sampler is runtime "any", CPU only, with no endpoint fields.
+    ebpf = examples["profile-metadata-ebpf.json"]
+    rejects(ebpf, "profile", lambda d: d["acquisition"].update({"sourceRef": "api-local-pprof"}))
+    rejects(ebpf, "profile", lambda d: d.update({"runtime": "go"}))
+    rejects(ebpf, "profile", lambda d: d.pop("detectedRuntimes"))
+    rejects(ebpf, "profile", lambda d: d.update({"profileType": "heap"}))
+    rejects(examples["profile-metadata.json"], "profile", lambda d: d.update({"runtime": "any"}))
+    rejects(examples["profile-metadata.json"], "profile", lambda d: d["acquisition"].update({"unattributedSamples": 1}))
+    rejects(examples["recipe-pprof.yaml"], "recipe", lambda d: d["spec"]["actions"][0]["parameters"]["source"].update({"kind": "ebpfSampler"}))
+    rejects(examples["recipe-pprof.yaml"], "recipe", lambda d: d["spec"]["actions"][0]["parameters"].update({"runtime": "any"}))
+    sampler = copy.deepcopy(examples["recipe-pprof.yaml"])
+    sampler["spec"]["actions"][0]["parameters"].update({"runtime": "any", "source": {"kind": "ebpfSampler"}})
+    validate(sampler, schemas[BASE + "recipe.schema.json"])
     rejects(examples["access-binding.yaml"], "access-binding", lambda d: d["spec"]["subjects"][0].pop("issuer"))
     rejects(examples["access-binding.yaml"], "access-binding", lambda d: d["spec"]["subjects"][0].update({"id": "*"}), True)
     for field, value in [("effect", "Deny"), ("roles", ["evidence-reader"]), ("subjects", [{"kind": "User", "issuer": "https://id.example.invalid", "id": "person"}])]:

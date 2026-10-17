@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "profile/v1",
+  "format": "pprof",
+  "runtime": "any",
+  "detectedRuntimes": ["python", "native"],
+  "profileType": "cpu",
+  "mode": "interval",
+  "sampleTypes": [
+    {
+      "type": "samples",
+      "unit": "count"
+    },
+    {
+      "type": "cpu",
+      "unit": "nanoseconds"
+    }
+  ],
+  "durationNanoseconds": 10000000000,
+  "samplePeriod": {
+    "type": "cpu",
+    "unit": "nanoseconds",
+    "value": 52631578
+  },
+  "lostSamples": 0,
+  "symbolCoverage": {
+    "resolvedLocations": 118,
+    "totalLocations": 131
+  },
+  "acquisition": {
+    "mechanism": "ebpfSampler",
+    "settingsKnown": true,
+    "unattributedSamples": 3
+  }
+}

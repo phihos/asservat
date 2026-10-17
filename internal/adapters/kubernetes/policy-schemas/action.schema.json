@@ -1065,7 +1065,8 @@
                 "jvm",
                 "node",
                 "python",
-                "native"
+                "native",
+                "any"
               ]
             },
             "type": {
@@ -1094,7 +1095,8 @@
                     "runtimeSocket",
                     "runtimeFile",
                     "nativeAttach",
-                    "gadget"
+                    "gadget",
+                    "ebpfSampler"
                   ]
                 },
                 "profileRef": {
@@ -1104,8 +1106,33 @@
                 }
               },
               "required": [
-                "kind",
-                "profileRef"
+                "kind"
+              ],
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "kind": {
+                        "const": "ebpfSampler"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  },
+                  "then": {
+                    "not": {
+                      "required": [
+                        "profileRef"
+                      ]
+                    }
+                  },
+                  "else": {
+                    "required": [
+                      "profileRef"
+                    ]
+                  }
+                }
               ]
             },
             "duration": {
@@ -1225,6 +1252,47 @@
                 "properties": {
                   "forceGC": {
                     "const": false
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "source": {
+                    "properties": {
+                      "kind": {
+                        "const": "ebpfSampler"
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ]
+                  }
+                },
+                "required": [
+                  "source"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "runtime": {
+                    "const": "any"
+                  },
+                  "type": {
+                    "const": "cpu"
+                  },
+                  "forceGC": {
+                    "const": false
+                  }
+                }
+              },
+              "else": {
+                "properties": {
+                  "runtime": {
+                    "not": {
+                      "const": "any"
+                    }
                   }
                 }
               }

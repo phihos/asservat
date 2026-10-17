@@ -19,7 +19,7 @@ Sensitivity and impact are independent. A read-only file can contain a credentia
 | `command` | On trigger | Absolute executable/argv, pod-resolved runtime roots, working directory, limits | Treat as mutating/credential-bearing; approval required; no default shell |
 | `httpDiagnostic` | On trigger | Named preconfigured endpoint, method GET, response bound | May expose pprof/metrics; SSRF-safe endpoint policy, no arbitrary URL |
 | `artifactCollect` | On trigger | Runtime-produced report/core path, readiness condition | Exact allowed path; incomplete files distinguished |
-| `profile` | On trigger | Go pprof CPU/heap/allocs/goroutine/block/mutex, runtime traces, JFR/EventPipe and qualified sampled profiles | Named source, explicit live-profiling grant, rate/overhead budget; details in [profiles](profiles.md) |
+| `profile` | On trigger | Go pprof CPU/heap/allocs/goroutine/block/mutex, runtime traces, JFR/EventPipe, qualified sampled profiles and the node collector's eBPF CPU sampler for any runtime ([ADR-201](../docs/decisions/201-ebpf-cpu-profiles.md)) | Named source, explicit live-profiling grant, rate/overhead budget; details in [profiles](profiles.md) |
 
 [Action lifecycles](action-lifecycle.md) define arming, incident saves, manual sessions and the explicit post-trigger-only variants. Mode is independent of sensitivity; an ongoing recorder needs authority and capacity before its first observation.
 
