@@ -43,6 +43,11 @@ type fixture struct {
 		NodeUID, NodeBootID, WorkloadUID string
 		Pod                              artifact.PinnedPod
 	}
+	// Identity is the owned Keycloak of the installed journey; only the
+	// installer-continuation harness starts one.
+	Identity *struct {
+		Base, RootCA, AdminUser, AdminPassword, UserPassword string
+	}
 }
 
 func request(t *testing.T, endpoint, token, path string, payload any, want int) map[string]any {

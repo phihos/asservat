@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"net"
 	"net/http"
 	"net/url"
@@ -49,7 +50,7 @@ import (
 // non-administrator source write is denied. The issuance logins are the
 // product fleet-bootstrap purposes the continuation provisioned; only the
 // fleet operator authority is fixture setup.
-func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, hub kubernetes.Interface, namespace string, providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
+func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, hub kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
 	t.Helper()
 	var offer contracts.RegionalOffer
 	if json.Unmarshal([]byte(offerJSON), &offer) != nil {
@@ -119,7 +120,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin 
 		qualifyRegionalExecutor(t, ctx, admin, region, offer, installed, peer)
 		qualifyRegionalJoin(t, ctx, f, hub, namespace, installation, *installed.Join)
 		if offer.Capacity != nil {
-			qualifyRegionalCapacity(t, ctx, admin, hub, region, namespace, installation, offer, installed)
+			qualifyRegionalCapacity(t, ctx, admin, hub, region, namespace, issuer, journey, installation, offer, installed)
 		}
 	}
 	// A rerun reopens every object unchanged.
@@ -514,7 +515,7 @@ func nodeInternalIP(t *testing.T, ctx context.Context, api kubernetes.Interface,
 // the owner's operation port, and after the operator adds a regional budget
 // policy, a labeled regional workload and its maintainer binding, the
 // hub-worker enrolls that workload through v2 to ready_at with a fresh binding.
-func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, region kubernetes.Interface, namespace, installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation) {
+func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation) {
 	t.Helper()
 	j := installed.Join
 	if j == nil || j.Capacity == nil || !slices.Equal(j.Capacity.Keys, slices.Sorted(slices.Values(offer.Capacity.Keys))) {
@@ -593,13 +594,19 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		t.Fatal("regional workload namespace", err)
 	}
 	labels := map[string]string{"app": "regional-app"}
-	app, err := region.AppsV1().Deployments(ns.Name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "regional-app"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(0)), Selector: &meta.LabelSelector{MatchLabels: labels},
-		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{Containers: []core.Container{{Name: "app", Image: offer.Image}}}}}}, meta.CreateOptions{})
+	// One running replica the installed journey captures from: the product
+	// image's idle proxy under a restricted security context.
+	app, err := region.AppsV1().Deployments(ns.Name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "regional-app"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels},
+		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false), TerminationGracePeriodSeconds: ptr.To(int64(3)),
+			SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
+			Containers: []core.Container{{Name: "app", Image: offer.Image, ImagePullPolicy: core.PullIfNotPresent, Command: []string{"/provider-proxy", "http://127.0.0.1:1", "http://127.0.0.1:1", "127.0.0.1:1"},
+				Resources:       core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("5m"), core.ResourceMemory: resource.MustParse("16Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}},
+				SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}}}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal("regional workload", err)
 	}
 	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "regional-maintainers"}, "spec": map[string]any{"effect": "Allow",
-		"subjects": []any{map[string]any{"kind": "Group", "issuer": "https://id.synthetic.invalid/realms/org", "id": "synthetic-group"}}, "roles": []any{"workload-maintainer"},
+		"subjects": []any{map[string]any{"kind": "Group", "issuer": issuer, "id": "synthetic-group"}}, "roles": []any{"workload-maintainer"},
 		"scope":  map[string]any{"clusterID": cluster, "namespaceRef": map[string]any{"name": ns.Name, "uid": string(ns.UID)}, "workloads": []any{map[string]any{"kind": "Deployment", "name": app.Name, "uid": string(app.UID)}}},
 		"reason": "ADR-197 native regional capacity"}}
 	body, _ = json.Marshal(binding)
@@ -655,6 +662,9 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		t.Fatal("pool revision chain", revisions, err)
 	}
 	t.Log("regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool extended once")
+	if journey != nil {
+		journey(cluster, ns.Name, app.Name)
+	}
 }
 
 // permissionScopeDiagnostics shows why a maintainer scope may be missing from

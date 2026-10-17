@@ -100,17 +100,29 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	providers.admin(t, ctx, http.MethodPost, "sys/mounts/"+publicTransit, map[string]any{"type": "transit"}, http.StatusNoContent)
 	providers.admin(t, ctx, http.MethodPost, "sys/mounts/"+workerPKI, map[string]any{"type": "pki", "config": map[string]any{"max_lease_ttl": "2h"}}, http.StatusNoContent)
 	providers.admin(t, ctx, http.MethodPost, workerPKI+"/root/generate/internal", map[string]any{"common_name": "synthetic-worker-root", "ttl": "2h", "key_type": "ec", "key_bits": 256}, http.StatusOK)
+	// The installed journey's owned Keycloak replaces the synthetic issuer,
+	// which is never contacted, and adds the MCP client.
+	origin, consoleSecret := "https://asservat.synthetic.invalid", "synthetic-client-secret"
+	issuer, providerRoots := "https://id.synthetic.invalid/realms/org", string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.NativeProviders.Root}))
+	clients := []contracts.IdentityClient{{ID: "console", Kind: "human", ClassQualified: true}}
+	var identity *installedIdentity
+	if f.Identity != nil {
+		identity = newInstalledIdentity(t, f, origin, consoleSecret)
+		issuer, providerRoots = identity.Issuer, identity.RootPEM
+		clients = append(clients, contracts.IdentityClient{ID: "mcp", Kind: "human", ClassQualified: true})
+	}
+	var publicRoot []byte // DER of the public listener's synthetic CA
 	document, _ := json.Marshal(contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: namespace,
 		WorkerProvider:      contracts.InstallerProviderSelection{AuthMount: providers.worker.AuthMount, AuthMountAccessor: providers.worker.AuthMountAccessor},
 		OwnerProvider:       contracts.InstallerProviderSelection{AuthMount: providers.owner.AuthMount, AuthMountAccessor: providers.owner.AuthMountAccessor},
 		OwnerIssuerRootsPEM: roots.String(), OwnerPKIMount: "owner-pki", OwnerConnections: 4, OwnerConcurrency: 2,
 		// ADR-185: synthetic browser identity settings exercise the public sources step.
-		Public: &contracts.InstallerPublicSettings{Origin: "https://asservat.synthetic.invalid", Issuer: "https://id.synthetic.invalid/realms/org", ClientID: "console",
-			MaxLifetimeSeconds: 3600, MaxLogins: 8, MaxSessions: 8, MaxLogoutEvents: 8, Clients: []contracts.IdentityClient{{ID: "console", Kind: "human", ClassQualified: true}},
+		Public: &contracts.InstallerPublicSettings{Origin: origin, Issuer: issuer, ClientID: "console",
+			MaxLifetimeSeconds: 3600, MaxLogins: 8, MaxSessions: 8, MaxLogoutEvents: 8, Clients: clients,
 			EligibleGroups: []string{"synthetic-group"}, GroupMaxAgeSeconds: 300,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
 			Capacity:            nativeCapacityProfile(),
-			ProcessingOperators: []contracts.ProcessingOperator{{ClientID: "console", Issuer: "https://id.synthetic.invalid/realms/org", Kind: "User", ID: "synthetic-operator"}},
+			ProcessingOperators: []contracts.ProcessingOperator{{ClientID: "console", Issuer: issuer, Kind: "User", ID: "synthetic-operator"}},
 			// ADR-193: the federation's operator choices.
 			Federation: &contracts.InstallerFederationSettings{ConnectorPKIMount: connectorPKI, ConnectorIssuerRootsPEM: connectorRoots,
 				Endpoint: federationEndpoint, ServerName: "federation.synthetic.invalid", ServiceType: "NodePort", NodePort: 31446,
@@ -128,8 +140,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				Defaults:              contracts.InstallerRetentionDurations{EvidenceSeconds: 86400, CaseMetadataSeconds: 86400, AuditMetadataSeconds: 86400},
 				Maxima:                contracts.InstallerRetentionDurations{EvidenceSeconds: 604800, CaseMetadataSeconds: 604800, AuditMetadataSeconds: 604800},
 				DeletionBudgetSeconds: 3600},
-			// ADR-194: the promoted launch; the synthetic issuer is never contacted at startup.
-			Promotion: &contracts.InstallerOwnerPromotion{BrowserAudience: "asservat-api", ProviderRootsPEM: string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.NativeProviders.Root})),
+			// ADR-194: the promoted launch.
+			Promotion: &contracts.InstallerOwnerPromotion{BrowserAudience: "asservat-api", ProviderRootsPEM: providerRoots,
+				// ADR-202: the public API's NodePort for the installed journey.
+				Exposure:     &contracts.InstallerPublicExposure{ServiceType: "NodePort", NodePort: 31450},
 				TransitMount: publicTransit, WorkerPKIMount: workerPKI, Version: "native-qualification"}}})
 	if _, err := api.CoreV1().ConfigMaps(namespace).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "operator-continuation"}, Immutable: ptr.To(true), Data: map[string]string{contracts.InstallerContinuationFile: string(document)}}, meta.CreateOptions{}); err != nil {
 		t.Fatal(err)
@@ -252,8 +266,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			}
 			if artifact.Public {
 				// ADR-194: the operator's OIDC client secret and public TLS pair.
-				_, certPEM, keyPEM := syntheticServingPair(t, "asservat.synthetic.invalid")
-				for name, b := range map[string][]byte{"oidc-client-secret": []byte("synthetic-client-secret"), "public-tls.crt": certPEM, "public-tls.key": keyPEM} {
+				var certPEM, keyPEM []byte
+				publicRoot, certPEM, keyPEM = syntheticServingPair(t, "asservat.synthetic.invalid")
+				for name, b := range map[string][]byte{"oidc-client-secret": []byte(consoleSecret), "public-tls.crt": certPEM, "public-tls.key": keyPEM} {
 					if e = os.WriteFile(filepath.Join(work, name), b, 0o600); e != nil {
 						t.Fatal(e)
 					}
@@ -440,7 +455,13 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	t.Log("baseline edit accepted and hub-worker restart Ready under a new epoch")
 	t.Log("promoted owner Ready with download sources, operator public Secret and observation on 9444")
 	// ADR-193 step 5: a regional cluster installed by installer-cluster.
-	qualifyRegionalInstall(t, ctx, f, admin, api, desired.TargetNamespace, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	// The first installed S-02 slice runs once the regional workload holds a
+	// fresh binding; it reads the public root generated during provider apply.
+	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
+	journey := func(cluster, namespace, workload string) {
+		installedJourney(t, ctx, identity, publicRoot, publicAddress, origin)(cluster, namespace, workload)
+	}
+	qualifyRegionalInstall(t, ctx, f, admin, api, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
 	// ADR-187: after the guard bridge the bootstrap hook replays (as on helm
 	// upgrade) and a second continuation finds the installation complete; the
 	// guard generation and the journal stay unchanged.
