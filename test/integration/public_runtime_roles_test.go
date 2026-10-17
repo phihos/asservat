@@ -84,7 +84,10 @@ func (r *publicRoleSQLRoot) ClaimPublicRuntimeRole(ctx context.Context, purpose 
 		if !n.Before(until) {
 			return contracts.PublicRuntimeRoleSnapshot{}, false, cfg.ErrUnavailable
 		}
-		role.Claim = &contracts.PublicRuntimeRoleClaim{OperationID: custodyID(), ClaimedAt: n, Until: until, DatabaseOID: db, PostmasterAt: postmaster}
+		// UTC like the other claim times: pgx returns the postmaster start in
+		// the local zone, and the snapshot's JSON round trip turns a UTC host's
+		// local zone into time.UTC, so != would see a changed claim on CI.
+		role.Claim = &contracts.PublicRuntimeRoleClaim{OperationID: custodyID(), ClaimedAt: n, Until: until, DatabaseOID: db, PostmasterAt: postmaster.UTC()}
 		r.claims++
 		if r.beforeClaim != nil {
 			r.beforeClaim()
