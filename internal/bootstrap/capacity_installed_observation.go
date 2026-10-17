@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	"context"
 	"os"
 	"time"
@@ -49,15 +50,25 @@ func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, 
 	if err != nil {
 		return nil, nil, mounts.ErrUnavailable
 	}
-	protection, err := kube.NewCapacityLocalOwnerProtection(observer, probe, c, m)
+	// The local observation path re-reads owner protection, endpoints and
+	// workload on both sides of every exchange. On the shared observer, which
+	// also serves the source, guard and processing loops every second, those
+	// reads were throttled past the five-second window (ADR-197 runs 24a-c:
+	// selected/tls/post after 2.3-4.9 s). Own client instances of the same
+	// identities, each at the fixed 20 QPS, as for the regional path.
+	localObserver, localProbe, err := capacityLocalObservationClients(in, c.Control.ClusterID, capacityWorkerRef(c.Control.Namespace), observerToken, probeToken)
 	if err != nil {
 		return nil, nil, err
 	}
-	endpoints, err := kube.NewOwnerEndpoints(observer, pin.Pool)
+	protection, err := kube.NewCapacityLocalOwnerProtection(localObserver, localProbe, c, m)
 	if err != nil {
 		return nil, nil, err
 	}
-	workloads, err := kube.NewOwnerObservationWorkload(observer, protection, pin)
+	endpoints, err := kube.NewOwnerEndpoints(localObserver, pin.Pool)
+	if err != nil {
+		return nil, nil, err
+	}
+	workloads, err := kube.NewOwnerObservationWorkload(localObserver, protection, pin)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,4 +153,17 @@ func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, 
 		return nil, nil, mounts.ErrUnavailable
 	}
 	return out, regional, nil
+}
+
+// capacityLocalObservationClients returns the local observation path's own
+// observer and probe clients: the same mounted identities as the shared
+// capacity clients, with their own fixed 20 QPS limiters.
+func capacityLocalObservationClients(in *providerInputs, cluster string, control cfg.NamespaceRef, observerToken, probeToken string) (observer, probe *kube.PermissionClient, err error) {
+	if observer, err = kube.NewPermissionClient(in.kubernetes(observerToken), cluster, control, time.Now); err != nil {
+		return nil, nil, mounts.ErrUnavailable
+	}
+	if probe, err = kube.NewPermissionClient(in.kubernetes(probeToken), cluster, control, time.Now); err != nil {
+		return nil, nil, mounts.ErrUnavailable
+	}
+	return observer, probe, nil
 }
