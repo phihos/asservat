@@ -163,3 +163,8 @@ Go, React/TypeScript and PostgreSQL. `make spec-check architecture-check` valida
 the specification; `make go-check` runs the Go gate; native suites such as
 `make context-integration` create and remove their own kind clusters and services.
 CI runs on every push; see [validation](docs/validation.md) for all gates.
+
+## License
+
+[Apache License 2.0](LICENSE). Contributions are welcome under the same terms; see
+[contributing](CONTRIBUTING.md).
