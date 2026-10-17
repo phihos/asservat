@@ -30,6 +30,10 @@ func (c *ConnectorProcessCredentials) observationKeys(ctx context.Context, leaf 
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	// The key mutex can block past the caller's original cutoff.
+	if contextExpired(ctx) {
+		return zero, value.ErrUnavailable
+	}
 	p := c.active
 	now := c.now()
 	if c.closed || c.root.Err() != nil || p == nil || p.retired || p.certs[0] == nil || p.installed[0] != leaf || !leaf.Valid(now) || !now.Before(p.process.RunUntil) {
@@ -56,10 +60,18 @@ func (c *ConnectorProcessCredentials) observationKeys(ctx context.Context, leaf 
 	for _, der := range p.certs[0].Certificate {
 		out.chain = append(out.chain, bytes.Clone(der))
 	}
-	if len(out.chain) < 1 || len(out.chain) > 4 || ctx.Err() != nil {
+	if len(out.chain) < 1 || len(out.chain) > 4 || contextExpired(ctx) {
 		return zero, value.ErrUnavailable
 	}
 	return out, nil
+}
+
+// contextExpired reports a cancelled context or a passed deadline. A deadline
+// is real time, and the timer that cancels its context can run late on a
+// loaded machine, so ctx.Err alone can still be nil after the cutoff.
+func contextExpired(ctx context.Context) bool {
+	d, ok := ctx.Deadline()
+	return ctx.Err() != nil || ok && !time.Now().Before(d)
 }
 
 func (c *ConnectorProcessCredentials) observationKeysCurrent(ctx context.Context, before connectorObservationKeys) error {

@@ -260,3 +260,32 @@ func TestConnectorObservationPrivateSnapshotHasNoActivationAuthority(t *testing.
 		t.Fatal("snapshot substituted for required independent hub SQL activation")
 	}
 }
+
+// lateTimerContext models a context whose deadline has passed while the timer
+// that cancels it has not yet run, as a loaded machine can show after the key
+// mutex wait (CI run 39030184148).
+type lateTimerContext struct {
+	context.Context
+	deadline time.Time
+}
+
+func (c lateTimerContext) Deadline() (time.Time, bool) { return c.deadline, true }
+
+func TestConnectorObservationKeysRefusePassedDeadlineBeforeItsTimer(t *testing.T) {
+	f := newConnectorPairFixture(t)
+	c := f.owner()
+	if err := c.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	keys, err := c.observationKeys(context.Background(), c.active.installed[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	late := lateTimerContext{context.Background(), time.Now().Add(-time.Millisecond)}
+	if _, err = c.observationKeys(late, c.active.installed[0]); err == nil {
+		t.Fatal("keys returned after the caller's deadline")
+	}
+	if c.observationKeysCurrent(late, keys) == nil {
+		t.Fatal("current keys accepted after the caller's deadline")
+	}
+}
