@@ -197,3 +197,37 @@ type staticCapacitySource struct{ v AcceptedCapacitySource }
 func (s staticCapacitySource) Observe(context.Context) (AcceptedCapacitySource, error) {
 	return s.v, nil
 }
+
+type staticCapacityDemands []CapacityRefreshDemand
+
+func (d staticCapacityDemands) ReadCapacityRefreshDemands(context.Context) ([]CapacityRefreshDemand, error) {
+	return d, nil
+}
+
+// ADR-200: a demanded workload is reconciled by the demand lane even while
+// discovery is paced away from it; a demand for an unknown cluster is ignored.
+func TestCapacityReconcilerDemandLaneReconcilesDemandedWorkload(t *testing.T) {
+	for _, known := range []bool{true, false} {
+		source, f := capacityObserverTestFixture()
+		q, _ := capacityQualificationFixture()
+		q.ID, q.Digest = f.accepted.QualificationID, f.accepted.QualificationDigest
+		q.RootBacking.RootID, q.RootBacking.InstallationID = f.accepted.RootID, f.accepted.InstallationID
+		q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
+		reader := &capacityRuntimeReader{recovery: f.recovery}
+		work := &CapacityWorkReconciler{Qualification: q, Recovery: reader, Permissions: reader, Processing: reader, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: reader, Now: func() time.Time { return f.now }}
+		cluster := q.NamespaceGuards[0].ClusterID
+		demand := CapacityRefreshDemand{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "ns-uid"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "api-uid"}, NotAfter: f.now.Add(time.Minute)}
+		if !known {
+			demand.ClusterID = "00000000-0000-4000-8000-0000000000ff"
+		}
+		var reports atomic.Int32
+		runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{{ClusterID: cluster, Workloads: reader, Guard: reader, Pace: time.Hour}},
+			Demands: staticCapacityDemands{demand}, DemandReport: func(error, time.Duration) { reports.Add(1) }}
+		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+		_ = runner.Run(ctx)
+		cancel()
+		if n := reports.Load(); known && n < 2 || !known && n != 0 {
+			t.Fatal("demand lane reconciliations", known, n)
+		}
+	}
+}

@@ -373,6 +373,17 @@ func (q *Queries) ReadCapacityRecovery(ctx context.Context, arg ReadCapacityReco
 	return recovery, err
 }
 
+const readCapacityRefreshDemands = `-- name: ReadCapacityRefreshDemands :one
+SELECT read_capacity_refresh_demands($1::uuid)::jsonb AS demands
+`
+
+func (q *Queries) ReadCapacityRefreshDemands(ctx context.Context, rootID pgtype.UUID) ([]byte, error) {
+	row := q.db.QueryRow(ctx, readCapacityRefreshDemands, rootID)
+	var demands []byte
+	err := row.Scan(&demands)
+	return demands, err
+}
+
 const readCapacityRoot = `-- name: ReadCapacityRoot :one
 SELECT read_capacity_root($1::uuid,$2::jsonb,$3::bytea,$4::bytea)::jsonb AS result
 `

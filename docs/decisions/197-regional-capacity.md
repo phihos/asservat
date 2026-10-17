@@ -523,3 +523,16 @@ regional slot.
     still running after two source intervals with its cluster and stage,
     and the hub cluster's observations and outcomes are logged as
     `capacity local ...`.
+  - [CI runs 21a–21c](../../test/results/adr197-continuation-ci-21a/native-continuation-1/context-storage-environment.json)
+    (39065053466, 39065059100, 39065064989): 21b passed (five of twelve).
+    No loop step stalled. The silence was the observation log, which
+    prints a line only when it differs from the previous one: discovery
+    walks every Deployment, StatefulSet and Pod in every regional
+    namespace, one exchange (about 2.2 s plus the 2 s pace) per step,
+    interleaved with the hub cluster's slow failing steps, so one pass
+    takes minutes. Admission requires a binding refreshed within the last
+    five seconds, and only that pass refreshes it. A regional binding is
+    therefore fresh for a few seconds every few minutes; the test passes
+    only when its three-second poll lands in the window after enrollment.
+    This is a design gap, not a race: [ADR-200](200-on-demand-capacity-refresh.md)
+    refreshes a workload's binding when admission needs it.

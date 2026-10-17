@@ -105,6 +105,33 @@ func (q *Queries) DeleteExpiredContextPreviews(ctx context.Context, rootID pgtyp
 	return result.RowsAffected(), nil
 }
 
+const demandCapacityRefresh = `-- name: DemandCapacityRefresh :exec
+SELECT demand_capacity_refresh($1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::text,$7::text)
+`
+
+type DemandCapacityRefreshParams struct {
+	RootID        pgtype.UUID
+	ClusterID     pgtype.UUID
+	NamespaceUid  string
+	NamespaceName string
+	WorkloadKind  string
+	WorkloadName  string
+	WorkloadUid   string
+}
+
+func (q *Queries) DemandCapacityRefresh(ctx context.Context, arg DemandCapacityRefreshParams) error {
+	_, err := q.db.Exec(ctx, demandCapacityRefresh,
+		arg.RootID,
+		arg.ClusterID,
+		arg.NamespaceUid,
+		arg.NamespaceName,
+		arg.WorkloadKind,
+		arg.WorkloadName,
+		arg.WorkloadUid,
+	)
+	return err
+}
+
 const findContextPreview = `-- name: FindContextPreview :one
 SELECT id, root_id, capture_id, attempt_id, actor_key, principal_key, blueprint_json, blueprint_sha256, created_at, deadline, closed_at, closed_request_key, closed_submission_digest FROM context_preview WHERE root_id=$1 AND id=$2 AND actor_key=$3
 `

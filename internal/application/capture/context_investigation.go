@@ -47,6 +47,13 @@ type ContextStorageReader interface {
 	ContextStorage(context.Context, authorization.Target) (ContextStorageObservation, error)
 }
 
+// ContextCapacityRefresh records a short-lived demand that the hub-worker
+// refresh one enrolled workload's binding (ADR-200). It names a workload and
+// confers no authority; the worker still performs every check.
+type ContextCapacityRefresh interface {
+	DemandCapacityRefresh(context.Context, targets.Request) error
+}
+
 // ContextReasonObservation belongs to a separate current protected control-data
 // reader. It checks exact ciphertext identity, actor/client, target and expiry;
 // a caller-supplied reference alone cannot establish those facts.
@@ -74,6 +81,7 @@ type ContextInvestigation struct {
 	Capabilities           ContextCapabilityReader
 	Retention              ContextRetentionResolver
 	Storage                ContextStorageReader
+	Refresh                ContextCapacityRefresh // optional (ADR-200)
 	Processing             ContextProcessingCoverageReader
 	Recovery               fleetapp.RecoveryReader
 	Reasons                ContextReasonReader
@@ -132,6 +140,7 @@ func (s ContextInvestigation) facts(ctx context.Context, source identities.Curre
 		return f, value.ErrChanged
 	}
 	t := target.Target()
+	s.awaitStorage(ctx, target)
 	f.eligibility = s.Eligibility.ContextEligibilityCurrent(ctx, source, t)
 	if !f.eligibility.Eligible || f.eligibility.Target != t || f.eligibility.Principal != actor || f.eligibility.VerifiedIdentity.Principal != actor || !f.eligibility.VerifiedIdentity.Valid(s.Now()) || !s.Now().Before(f.eligibility.ValidUntil) {
 		return f, value.ErrDenied
@@ -397,4 +406,35 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 		return zero, value.ErrDenied
 	}
 	return a, nil
+}
+
+// storageMargin is the binding freshness awaitStorage wants left, so the
+// remaining facts and the final storage read fit inside the same refresh.
+const storageMargin = time.Second
+
+// awaitStorage waits, within the caller's original deadline, for a binding the
+// hub-worker refreshed recently enough to have storageMargin left (ADR-200).
+// Otherwise it records a refresh demand and rereads every 250 ms. It runs
+// before the other facts so their own freshness intervals are not spent
+// waiting. It returns nothing: the ordinary storage read still decides.
+func (s ContextInvestigation) awaitStorage(ctx context.Context, target targets.PodResolution) {
+	if s.Refresh == nil || s.Storage == nil {
+		return
+	}
+	ready := func() bool {
+		v, err := s.Storage.ContextStorage(ctx, target.Target())
+		return err == nil && !v.Binding.FreshUntil.Before(s.Now().Add(storageMargin))
+	}
+	if ready() || s.Refresh.DemandCapacityRefresh(ctx, target.Request) != nil {
+		return
+	}
+	for !ready() {
+		t := time.NewTimer(250 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return
+		case <-t.C:
+		}
+	}
 }

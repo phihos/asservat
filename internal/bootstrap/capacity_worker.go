@@ -290,9 +290,14 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 	if err != nil || startup.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	demands, err := postgres.NewCapacityRefreshDemands(startup, pools["capacity"], c.PermissionRootID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
 	d.reconciler = &app.CapacityReconciler{Source: &app.CapacitySourceObserver{RootID: c.PermissionRootID, InstallationID: c.InstallationID, QualificationID: q.ID, QualificationDigest: q.Digest, Source: source, Protection: guard, Recovery: journal, Journal: journal, Now: time.Now},
 		Work: &app.CapacityWorkReconciler{Qualification: q, Recovery: journal, Permissions: permissions, Processing: processing, Root: &app.RootBackingCoordinator{Store: general, Capture: capture, Now: time.Now}, Enrollment: &app.EnrollmentCoordinator{Store: enroll, Capture: captureEnroll, Accounts: accounts, Now: time.Now}, Bindings: enroll, Now: time.Now, Regional: regional}, Clusters: clusters,
 		SourceReport: capacitySourceReporter(),
+		Demands:      demands, DemandReport: capacityDemandReporter(),
 		Stalled: func(cluster, stage string) {
 			fmt.Fprintf(os.Stderr, "capacity workload loop stalled: cluster %s in %s for over %s\n", cluster, stage, 2*app.CapacitySourceInterval)
 		}}
@@ -359,6 +364,18 @@ func capacitySourceReporter() func(error) {
 		if outcome := regionalOutcome(err); outcome != last {
 			last = outcome
 			fmt.Fprintln(os.Stderr, "capacity source: "+outcome)
+		}
+	}
+}
+
+// capacityDemandReporter logs one line per change of the ADR-200 demand
+// lane's outcome. The lane is serial, so the closure needs no lock.
+func capacityDemandReporter() func(error, time.Duration) {
+	last := ""
+	return func(err error, elapsed time.Duration) {
+		if outcome := regionalOutcome(err); outcome != last {
+			last = outcome
+			fmt.Fprintf(os.Stderr, "capacity demand refresh: %s after %s\n", outcome, elapsed.Round(10*time.Millisecond))
 		}
 	}
 }

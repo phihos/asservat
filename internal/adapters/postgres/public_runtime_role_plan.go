@@ -148,6 +148,8 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("context_preview", "INSERT")
 		add("context_preview", "DELETE")
 		add("context_preview_fence", "DELETE")
+		// ADR-200: a refresh demand for an enrolled workload; no authority.
+		out = append(out, publicRuntimeGrant{"function", "demand_capacity_refresh(uuid,uuid,text,text,text,text,text)", "", "EXECUTE"})
 	case "capture-resolution":
 		// Current same-actor request resolution may only close a passive draft
 		// or fence its absent original ID. It cannot admit/cancel accepted work.

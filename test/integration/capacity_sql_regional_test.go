@@ -138,6 +138,44 @@ func (f *capacitySQLFixture) qualifyRegionalExtension(t *testing.T, first app.En
 	}) {
 		return
 	}
+	// ADR-200: a refresh demand is recorded only for an enrolled, ready
+	// workload, and only the capacity writer reads demands back.
+	if !t.Run("refresh-demand-names-only-ready-workloads", func(t *testing.T) {
+		var cluster, nsUID, workloadUID string
+		if err := f.admin.QueryRow(f.ctx, `SELECT cluster_id::text,namespace_uid,workload_uid FROM capacity_workload WHERE root_id=$1 AND ready_at IS NOT NULL ORDER BY workload_uid LIMIT 1`, root).Scan(&cluster, &nsUID, &workloadUID); err != nil {
+			t.Fatal("ready workload", err)
+		}
+		demand := func(kind, workload string) error {
+			_, err := f.admin.Exec(f.ctx, `SELECT demand_capacity_refresh($1,$2,$3,'payments',$4,'api',$5)`, root, cluster, nsUID, kind, workload)
+			return err
+		}
+		if err := demand("Deployment", workloadUID); err != nil {
+			t.Fatal("demand for a ready workload", err)
+		}
+		if err := demand("Deployment", custodyID()); err != nil {
+			t.Fatal("an unknown workload must be a silent no-op", err)
+		}
+		if err := demand("CronJob", workloadUID); err == nil {
+			t.Fatal("an unsupported kind was accepted")
+		}
+		reader, err := postgres.NewCapacityRefreshDemands(f.ctx, f.roles["capacity"], root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := reader.ReadCapacityRefreshDemands(f.ctx)
+		if err != nil || len(got) != 1 || got[0].ClusterID != cluster || got[0].Workload.UID != workloadUID || got[0].Namespace.Name != "payments" || got[0].Workload.Name != "api" {
+			t.Fatal("capacity writer demand read", got, err)
+		}
+		other, err := postgres.NewCapacityRefreshDemands(f.ctx, f.roles["capacity-capture"], root)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := other.ReadCapacityRefreshDemands(f.ctx); err == nil {
+			t.Fatal("a non-writer capacity role read demands")
+		}
+	}) {
+		return
+	}
 	t.Run("non-additive-change-is-refused", func(t *testing.T) {
 		changed := f.template
 		changed.Policies = slices.Clone(f.template.Policies)

@@ -16,6 +16,16 @@ namespace/workload UID, approved selector labels and ownership are reread before
 enrollment. Accepted maintainer assignments identify eligible scopes without
 turning a group, candidate or capacity account into collection authority.
 
+Admission needs a binding refreshed within the last five seconds, and a
+discovery pass revisits a workload only once per pass, which takes minutes on a
+regional cluster. Under [ADR-200](../decisions/200-on-demand-capacity-refresh.md)
+the capture preview and request path records a short refresh demand
+(`demand_capacity_refresh`, capture-preview role, ready workloads only) and
+waits within its original deadline. The worker's demand lane
+(`read_capacity_refresh_demands`, capacity writer) reconciles demanded workloads
+back to back through the same guarded path as discovery. A demand names a
+workload and confers no authority.
+
 `capacity-root-setup.json` is a private generated administrator input. It binds
 original installation/activation, permission root, public role-root UID/setup,
 control namespace/guard, account-key version and a closed qualified backing

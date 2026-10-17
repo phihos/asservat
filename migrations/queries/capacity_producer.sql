@@ -66,3 +66,6 @@ SELECT read_capacity_cluster_qualifications(sqlc.arg(root_id)::uuid)::jsonb AS q
 
 -- name: QualifyCapacityCluster :one
 SELECT qualify_capacity_cluster(sqlc.arg(root_id)::uuid,sqlc.arg(cluster_id)::uuid,sqlc.arg(peer_id)::uuid,sqlc.arg(issuer_epoch)::uuid,sqlc.arg(guard_digest)::bytea,sqlc.arg(guard_keys)::jsonb)::boolean AS inserted;
+
+-- name: ReadCapacityRefreshDemands :one
+SELECT read_capacity_refresh_demands(sqlc.arg(root_id)::uuid)::jsonb AS demands;

@@ -27,6 +27,8 @@ func publicRuntimeCapacityGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			"refresh_capacity_enrollment(uuid,jsonb,bytea,bytea,bytea,jsonb)",
 			// ADR-197: the regional namespace pins.
 			"read_capacity_cluster_qualifications(uuid)",
+			// ADR-200: active refresh demands.
+			"read_capacity_refresh_demands(uuid)",
 		}
 	case "capacity-capture":
 		signatures = []string{

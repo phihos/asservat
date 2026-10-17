@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-200 — On-demand capacity refresh](200-on-demand-capacity-refresh.md)
+keeps the five-second binding freshness bound and refreshes a workload's binding when a capture preview,
+request or download needs it: admission records a short demand, the hub-worker reconciles demanded
+workloads first, and admission waits within its original deadline.
+
 [ADR-199 — One source read at each end of the executor proof](199-executor-proof-source-reads.md)
 reads the guarded connector source once when the executor's cold proof opens and once when it closes,
 checking the owned process and the attestation against those reads instead of six source reads, so

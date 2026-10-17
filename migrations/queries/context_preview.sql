@@ -43,3 +43,6 @@ DELETE FROM context_preview_fence WHERE (root_id,preview_id,actor_key) IN (
  SELECT f.root_id,f.preview_id,f.actor_key FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.expires_at<=clock_timestamp()
  ORDER BY f.expires_at,f.preview_id LIMIT 1000
 );
+
+-- name: DemandCapacityRefresh :exec
+SELECT demand_capacity_refresh(sqlc.arg(root_id)::uuid,sqlc.arg(cluster_id)::uuid,sqlc.arg(namespace_uid)::text,sqlc.arg(namespace_name)::text,sqlc.arg(workload_kind)::text,sqlc.arg(workload_name)::text,sqlc.arg(workload_uid)::text);

@@ -275,8 +275,14 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	// ADR-200: a stale binding records a refresh demand with the
+	// capture-preview credentials; storage-read stays SELECT-only.
+	refresh, err := postgres.NewCapacityRefreshDemands(ctx, sql["capture-preview"], root)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
 	out.investigation = captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: previews, Replay: admissionsSQL, Admission: admissionsSQL, Resolution: resolution,
-		Targets: contextstart.Targets{Router: router, Now: time.Now}, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Processing: processing, Recovery: out.recovery,
+		Targets: contextstart.Targets{Router: router, Now: time.Now}, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery,
 		Lifetime: time.Duration(p.PreviewSeconds) * time.Second}
 
 	completed, err := postgres.NewCaptureOperationIntents(ctx, sql["capture-intent-read"], root)

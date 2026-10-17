@@ -233,6 +233,18 @@ type CapacityPoolRevision struct {
 	SupersededAt pgtype.Timestamptz
 }
 
+type CapacityRefreshDemand struct {
+	RootID        pgtype.UUID
+	ClusterID     pgtype.UUID
+	NamespaceUid  string
+	NamespaceName string
+	WorkloadKind  string
+	WorkloadName  string
+	WorkloadUid   string
+	RequestedAt   pgtype.Timestamptz
+	NotAfter      pgtype.Timestamptz
+}
+
 type CapacitySource struct {
 	RootID                pgtype.UUID
 	InstallationID        pgtype.UUID

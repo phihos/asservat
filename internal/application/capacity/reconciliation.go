@@ -27,7 +27,12 @@ type CapacityReconciler struct {
 	// all clusters, so one stuck step starves every other cluster. ADR-197
 	// runs 20a/20c went silent after enrolling. Diagnostics only.
 	Stalled func(clusterID, stage string)
-	running atomic.Bool
+	// Demands, when set, adds the ADR-200 demand lane: workloads whose
+	// admission asked for a fresh binding are reconciled first, back to
+	// back, while the demand lasts. DemandReport sees each outcome.
+	Demands      CapacityRefreshDemandReader
+	DemandReport func(error, time.Duration)
+	running      atomic.Bool
 }
 
 // CapacitySourceInvocation is only the existing source invocation boundary.
@@ -147,6 +152,9 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 	defer current.clear()
 	var owners sync.WaitGroup
 	owners.Add(3)
+	if s.Demands != nil {
+		owners.Add(1)
+	}
 	go func() {
 		defer owners.Done()
 		observe := func(call context.Context) {
@@ -226,51 +234,77 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 			// The candidate LIST does not confer freshness. The exact read gets a
 			// separate original source interval; no already-issued permit changes.
 			started := s.Work.Now()
-			report := s.Clusters[i].Report
-			if s.Clusters[i].Guarded != nil {
-				// ADR-197: a regional guarded read runs on its own request
-				// window first and only then takes the current source, so the
-				// two-to-three-second exchange never spends a source snapshot's
-				// remaining freshness. Composition still intersects every
-				// original interval, and every effect follows every check.
-				mark("guarded-read")
-				facts, err := s.Work.ReadGuardedCandidate(call, s.Clusters[i], ns, candidate)
-				if err == nil {
-					err = capacityStage("source", cfg.ErrUnavailable)
-					if original, v, ok := current.read(s.Work.Now()); ok {
-						until, _ := call.Deadline()
-						live, end := context.WithDeadline(original, until)
-						mark("guarded-reconcile")
-						err = s.Work.ReconcileGuardedWorkload(live, v, s.Clusters[i], ns, candidate, facts)
-						end()
-					}
-				}
-				if report != nil {
-					report(err, s.Work.Now().Sub(started))
-				}
-				return
-			}
-			original, v, ok := current.read(s.Work.Now())
-			if !ok {
-				if report != nil {
-					report(capacityStage("source", cfg.ErrUnavailable), s.Work.Now().Sub(started))
-				}
-				return
-			}
-			until, _ := call.Deadline()
-			live, end := context.WithDeadline(original, until)
-			defer end()
-			mark("reconcile")
-			err = s.Work.ReconcileWorkload(live, v, s.Clusters[i], ns, candidate)
-			if report != nil {
+			err = s.reconcileCandidate(call, &current, s.Clusters[i], ns, candidate, mark)
+			if report := s.Clusters[i].Report; report != nil {
 				report(err, s.Work.Now().Sub(started))
 			}
 		})
 	}()
+	if s.Demands != nil {
+		go func() {
+			defer owners.Done()
+			s.runDemands(root, &current)
+		}()
+	}
 	<-root.Done()
 	current.clear()
 	// Cancel first, then join actual owners. Returning on a shutdown timer
 	// would release the fixed SQL/process envelope with work still running.
 	owners.Wait()
 	return root.Err()
+}
+
+// reconcileCandidate runs one candidate through the regional guarded path
+// (ADR-197: the guarded read first, then the current source) or the ordinary
+// path. mark names the running stage for the stall watchdog.
+func (s *CapacityReconciler) reconcileCandidate(call context.Context, current *capacityCurrentSource, c CapacityClusterReaders, ns cfg.NamespaceRef, candidate cfg.WorkloadRef, mark func(string)) error {
+	var facts *CapacityGuardedFacts
+	if c.Guarded != nil {
+		mark("guarded-read")
+		v, err := s.Work.ReadGuardedCandidate(call, c, ns, candidate)
+		if err != nil {
+			return err
+		}
+		facts = &v
+	}
+	original, v, ok := current.read(s.Work.Now())
+	if !ok {
+		return capacityStage("source", cfg.ErrUnavailable)
+	}
+	until, _ := call.Deadline()
+	live, end := context.WithDeadline(original, until)
+	defer end()
+	if facts != nil {
+		mark("guarded-reconcile")
+		return s.Work.ReconcileGuardedWorkload(live, v, c, ns, candidate, *facts)
+	}
+	mark("reconcile")
+	return s.Work.ReconcileWorkload(live, v, c, ns, candidate)
+}
+
+// runDemands is the ADR-200 demand lane. Each step reads the active demands
+// and reconciles one of them, round robin, with no pace: a regional refresh
+// takes about one exchange, and the binding stays fresh for five seconds
+// from its observation. Discovery keeps enrolling new workloads beside it.
+func (s *CapacityReconciler) runDemands(root context.Context, current *capacityCurrentSource) {
+	turn := 0
+	capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
+		demands, err := s.Demands.ReadCapacityRefreshDemands(call)
+		if err != nil || len(demands) == 0 || call.Err() != nil {
+			return
+		}
+		d := demands[turn%len(demands)]
+		turn++
+		for _, c := range s.Clusters {
+			if c.ClusterID != d.ClusterID {
+				continue
+			}
+			started := s.Work.Now()
+			err = s.reconcileCandidate(call, current, c, d.Namespace, d.Workload, func(string) {})
+			if s.DemandReport != nil {
+				s.DemandReport(err, s.Work.Now().Sub(started))
+			}
+			return
+		}
+	})
 }
