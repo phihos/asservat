@@ -72,6 +72,13 @@ fresh runner; their `test/results` output is uploaded as a run artifact. A CI ru
 is recorded like a local run: run URL, exit, selected tests and the harness's
 source hashes.
 
+`main` accepts changes only through squash-merged pull requests (repository
+ruleset `protect-main`: no direct push, force push or deletion; review threads
+must be resolved). The ruleset requires the `ci-ok` job: `changes` and `checks` must
+pass, and the Go, test and console jobs must pass unless `changes` classified the
+change as documentation-only. Native suites can be
+dispatched on a pull request branch with `gh workflow run native.yml --ref <branch>`.
+
 For local debugging, `scripts/test-context-storage.py --keep-on-failure` leaves
 a failed run's own clusters and labelled containers (and the Go fixtures'
 objects) running and records them in a manifest under the build cache;
