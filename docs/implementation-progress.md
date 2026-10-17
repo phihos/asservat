@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Regional capacity on demand (ADR-197, ADR-200)
+
+The installed two-cluster continuation now enrolls a regional workload through
+the v2 exchange and keeps its binding fresh on demand. Admission needs a binding
+refreshed within five seconds, and a regional discovery pass takes minutes, so
+[ADR-200](decisions/200-on-demand-capacity-refresh.md) adds a refresh demand
+(migration 00066, schema 66) that the hub-worker's demand lane serves back to
+back; capture preview and request wait for it within their original deadline.
+The PostgreSQL stage passes on CI
+([fleet run](../test/results/adr200-fleet-ci-4/native-fleet-1/fleet-environment.json)).
+Native CI continuation runs [24a](../test/results/adr200-continuation-ci-24a/native-continuation-1/context-storage-environment.json),
+[25a](../test/results/adr200-continuation-ci-25a/native-continuation-1/context-storage-environment.json) and
+[25c](../test/results/adr200-continuation-ci-25c/native-continuation-1/context-storage-environment.json)
+pass: after one demand the regional binding had five or six refreshes and seven
+to nine samples with at least a second of freshness in 15 s. Three of the last
+six runs pass. The failures are the hub-worker's permission reconciler stopping
+(24b `refresh/confirm-expired`, 24c `refresh/accept` and `start`), which leaves
+the permission stream stale so no capacity source is accepted, and a slow owner
+start in 25b ("owner native port not reachable"). The reconciler's phases are
+now labelled for the next failure. Hub-cluster capacity observation was
+throttled past its window on a shared client (PR #8 gives it its own). Downloads
+still rely on discovery refreshes; the installed S-02 journey is not complete.
+
 ## Rotating cluster credential (ADR-168) and bounded streaming custody (ADR-166)
 
 ADR-168 components are implemented: domain decision, Ed25519
