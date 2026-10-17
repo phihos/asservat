@@ -409,3 +409,13 @@ regional slot.
     federation now admits four conversations; its SQL pools stay at one
     connection each. The window hypothesis is not supported: the failures
     are channel refusals, not expired bounds.
+  - [CI run 10](../../test/results/adr197-continuation-ci-10/native-continuation-1/context-storage-environment.json)
+    (run 39042349815): with four federation slots the `hub-channel`
+    refusals are gone and failed exchanges fell from about fourteen to
+    four. Discovery observations now always succeed; every guarded-workload
+    observation still fails. The one that reached the region did its
+    guarded metadata (14 calls) and read 3, then its final native read
+    failed after 12 of its 22 calls. The metadata client was a copy of the
+    native reader's client and shared its 20 QPS limiter, so the guarded
+    metadata spent the final bracket's budget. The metadata now has its
+    own observer instance at the same fixed limit.

@@ -1,0 +1,200 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-17 14:50:55.423 UTC [61] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-17 14:50:55.423 UTC [61] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-17 14:50:55.426 UTC [67] LOG:  database system was shut down at 2026-10-17 14:50:55 UTC
+2026-10-17 14:50:55.429 UTC [61] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-17 14:50:55.596 UTC [61] LOG:  received fast shutdown request
+.2026-10-17 14:50:55.596 UTC [61] LOG:  aborting any active transactions
+2026-10-17 14:50:55.599 UTC [61] LOG:  background worker "logical replication launcher" (PID 70) exited with exit code 1
+2026-10-17 14:50:55.599 UTC [65] LOG:  shutting down
+2026-10-17 14:50:55.600 UTC [65] LOG:  checkpoint starting: shutdown immediate
+2026-10-17 14:50:55.685 UTC [65] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.075 s, sync=0.011 s, total=0.086 s; sync files=303, longest=0.009 s, average=0.001 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-17 14:50:55.695 UTC [61] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-17 14:50:55.713 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-17 14:50:55.714 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-17 14:50:55.714 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-17 14:50:55.714 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-17 14:50:55.717 UTC [95] LOG:  database system was shut down at 2026-10-17 14:50:55 UTC
+2026-10-17 14:50:55.721 UTC [1] LOG:  database system is ready to accept connections
+2026-10-17 14:55:55.817 UTC [93] LOG:  checkpoint starting: time
+2026-10-17 14:56:13.847 UTC [272] FATAL:  password authentication failed for user "asservat_init_4e8682d94ed14186b5807c8c6dbf042a_manager"
+2026-10-17 14:56:13.847 UTC [272] DETAIL:  User "asservat_init_4e8682d94ed14186b5807c8c6dbf042a_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-17 14:56:14.401 UTC [273] FATAL:  password authentication failed for user "asservat_init_4e8682d94ed14186b5807c8c6dbf042a_manager"
+2026-10-17 14:56:14.401 UTC [273] DETAIL:  User "asservat_init_4e8682d94ed14186b5807c8c6dbf042a_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-17 14:56:48.526 UTC [276] FATAL:  password authentication failed for user "asservat_init_4e8682d94ed14186b5807c8c6dbf042a_manager"
+2026-10-17 14:56:48.526 UTC [276] DETAIL:  User "asservat_init_4e8682d94ed14186b5807c8c6dbf042a_manager" has no password assigned.
+	Connection matched file "/var/lib/postgresql/18/docker/pg_hba.conf" line 128: "host all all all scram-sha-256"
+2026-10-17 14:57:29.668 UTC [93] LOG:  checkpoint complete: wrote 939 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=93.847 s, sync=0.003 s, total=93.852 s; sync files=630, longest=0.001 s, average=0.001 s; distance=10142 kB, estimate=10142 kB; lsn=0/26037A0, redo lsn=0/257C9A0
+2026-10-17 14:58:58.287 UTC [289] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_cfg_00" by role "postgres"
+2026-10-17 14:59:01.537 UTC [289] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_cfg_01" by role "postgres"
+2026-10-17 14:59:04.786 UTC [289] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_cfg_02" by role "postgres"
+2026-10-17 14:59:31.622 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_00" by role "postgres"
+2026-10-17 14:59:34.223 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_01" by role "postgres"
+2026-10-17 14:59:36.822 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_02" by role "postgres"
+2026-10-17 14:59:39.422 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_03" by role "postgres"
+2026-10-17 14:59:42.027 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_04" by role "postgres"
+2026-10-17 14:59:44.626 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_05" by role "postgres"
+2026-10-17 14:59:47.222 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_06" by role "postgres"
+2026-10-17 14:59:49.822 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_10" by role "postgres"
+2026-10-17 14:59:52.421 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_11" by role "postgres"
+2026-10-17 14:59:55.021 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_12" by role "postgres"
+2026-10-17 14:59:57.624 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_13" by role "postgres"
+2026-10-17 15:00:00.223 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_14" by role "postgres"
+2026-10-17 15:00:02.822 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_15" by role "postgres"
+2026-10-17 15:00:05.421 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_16" by role "postgres"
+2026-10-17 15:00:08.023 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_17" by role "postgres"
+2026-10-17 15:00:10.622 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_18" by role "postgres"
+2026-10-17 15:00:13.222 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_19" by role "postgres"
+2026-10-17 15:00:15.822 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_20" by role "postgres"
+2026-10-17 15:00:18.425 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_30" by role "postgres"
+2026-10-17 15:00:21.021 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_31" by role "postgres"
+2026-10-17 15:00:23.628 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_32" by role "postgres"
+2026-10-17 15:00:26.222 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_33" by role "postgres"
+2026-10-17 15:00:28.822 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_34" by role "postgres"
+2026-10-17 15:00:31.425 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_40" by role "postgres"
+2026-10-17 15:00:34.022 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_41" by role "postgres"
+2026-10-17 15:00:36.645 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_42" by role "postgres"
+2026-10-17 15:00:39.222 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_46" by role "postgres"
+2026-10-17 15:00:41.823 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_47" by role "postgres"
+2026-10-17 15:00:44.424 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_21" by role "postgres"
+2026-10-17 15:00:47.026 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_22" by role "postgres"
+2026-10-17 15:00:49.625 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_23" by role "postgres"
+2026-10-17 15:00:52.227 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_28" by role "postgres"
+2026-10-17 15:00:54.822 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_29" by role "postgres"
+2026-10-17 15:00:55.768 UTC [93] LOG:  checkpoint starting: time
+2026-10-17 15:00:57.427 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_35" by role "postgres"
+2026-10-17 15:01:00.024 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_36" by role "postgres"
+2026-10-17 15:01:02.622 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_37" by role "postgres"
+2026-10-17 15:01:05.225 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_38" by role "postgres"
+2026-10-17 15:01:07.822 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_39" by role "postgres"
+2026-10-17 15:01:10.426 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_57" by role "postgres"
+2026-10-17 15:01:13.025 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_58" by role "postgres"
+2026-10-17 15:01:15.627 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_59" by role "postgres"
+2026-10-17 15:01:15.703 UTC [93] LOG:  checkpoint complete: wrote 199 buffers (1.2%), wrote 4 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=19.933 s, sync=0.002 s, total=19.936 s; sync files=57, longest=0.001 s, average=0.001 s; distance=1669 kB, estimate=9295 kB; lsn=0/27A86E0, redo lsn=0/271DEA8
+2026-10-17 15:01:18.225 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_60" by role "postgres"
+2026-10-17 15:01:20.826 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_61" by role "postgres"
+2026-10-17 15:01:23.425 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_62" by role "postgres"
+2026-10-17 15:01:26.025 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_63" by role "postgres"
+2026-10-17 15:01:28.622 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_64" by role "postgres"
+2026-10-17 15:01:31.223 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_74" by role "postgres"
+2026-10-17 15:01:33.823 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_75" by role "postgres"
+2026-10-17 15:01:36.422 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_76" by role "postgres"
+2026-10-17 15:01:39.023 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_77" by role "postgres"
+2026-10-17 15:01:41.621 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_85" by role "postgres"
+2026-10-17 15:01:44.225 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_43" by role "postgres"
+2026-10-17 15:01:46.823 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_44" by role "postgres"
+2026-10-17 15:01:49.427 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_45" by role "postgres"
+2026-10-17 15:01:52.026 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_48" by role "postgres"
+2026-10-17 15:01:54.625 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_49" by role "postgres"
+2026-10-17 15:01:57.223 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_50" by role "postgres"
+2026-10-17 15:01:59.824 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_51" by role "postgres"
+2026-10-17 15:02:02.426 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_52" by role "postgres"
+2026-10-17 15:02:05.022 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_56" by role "postgres"
+2026-10-17 15:02:07.625 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_24" by role "postgres"
+2026-10-17 15:02:10.227 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_25" by role "postgres"
+2026-10-17 15:02:12.824 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_26" by role "postgres"
+2026-10-17 15:02:15.425 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_27" by role "postgres"
+2026-10-17 15:02:18.024 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_65" by role "postgres"
+2026-10-17 15:02:20.624 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_66" by role "postgres"
+2026-10-17 15:02:23.227 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_53" by role "postgres"
+2026-10-17 15:02:25.824 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_54" by role "postgres"
+2026-10-17 15:02:28.424 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_55" by role "postgres"
+2026-10-17 15:02:31.026 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_70" by role "postgres"
+2026-10-17 15:02:33.623 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_71" by role "postgres"
+2026-10-17 15:02:36.227 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_72" by role "postgres"
+2026-10-17 15:02:38.823 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_73" by role "postgres"
+2026-10-17 15:02:41.423 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_78" by role "postgres"
+2026-10-17 15:02:44.023 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_79" by role "postgres"
+2026-10-17 15:02:46.626 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_80" by role "postgres"
+2026-10-17 15:02:49.224 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_81" by role "postgres"
+2026-10-17 15:02:51.823 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_82" by role "postgres"
+2026-10-17 15:02:54.430 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_83" by role "postgres"
+2026-10-17 15:02:57.025 UTC [299] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_pub_84" by role "postgres"
+2026-10-17 15:05:00.238 UTC [391] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_own_00" by role "postgres"
+2026-10-17 15:05:09.135 UTC [391] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_own_01" by role "postgres"
+2026-10-17 15:05:18.036 UTC [391] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_own_02" by role "postgres"
+2026-10-17 15:05:26.934 UTC [391] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_own_03" by role "postgres"
+2026-10-17 15:05:35.834 UTC [391] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_own_04" by role "postgres"
+2026-10-17 15:05:44.737 UTC [391] WARNING:  role "postgres" has not been granted membership in role "as_4e8682d94ed14186b5807c8c6dbf042a_own_05" by role "postgres"
+2026-10-17 15:05:55.797 UTC [93] LOG:  checkpoint starting: time
+2026-10-17 15:06:26.949 UTC [93] LOG:  checkpoint complete: wrote 311 buffers (1.9%), wrote 5 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=31.150 s, sync=0.001 s, total=31.153 s; sync files=82, longest=0.001 s, average=0.001 s; distance=2680 kB, estimate=8633 kB; lsn=0/29E0380, redo lsn=0/29BC210
+2026-10-17 15:07:34.045 UTC [658] ERROR:  capacity permission root unavailable
+2026-10-17 15:07:34.045 UTC [658] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 25 at RAISE
+2026-10-17 15:07:34.045 UTC [658] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 15:07:36.751 UTC [658] ERROR:  capacity permission root unavailable
+2026-10-17 15:07:36.751 UTC [658] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 25 at RAISE
+2026-10-17 15:07:36.751 UTC [658] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 15:07:39.931 UTC [658] ERROR:  capacity permission root unavailable
+2026-10-17 15:07:39.931 UTC [658] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 25 at RAISE
+2026-10-17 15:07:39.931 UTC [658] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 15:08:34.526 UTC [675] ERROR:  capacity permission root unavailable
+2026-10-17 15:08:34.526 UTC [675] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 25 at RAISE
+2026-10-17 15:08:34.526 UTC [675] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 15:08:37.178 UTC [675] ERROR:  capacity permission root unavailable
+2026-10-17 15:08:37.178 UTC [675] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 25 at RAISE
+2026-10-17 15:08:37.178 UTC [675] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 15:08:40.864 UTC [687] ERROR:  query returned no rows
+2026-10-17 15:08:40.864 UTC [687] CONTEXT:  PL/pgSQL function public.activate_cluster_bootstrap(uuid,uuid,bytea,bytea) line 7 at SQL statement
+2026-10-17 15:08:40.864 UTC [687] STATEMENT:  SELECT lineage::text, generation, issued_at, valid_until, replay, fenced FROM public.activate_cluster_bootstrap($1,$2,$3,$4)
+2026-10-17 15:08:41.001 UTC [675] ERROR:  capacity permission root unavailable
+2026-10-17 15:08:41.001 UTC [675] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 25 at RAISE
+2026-10-17 15:08:41.001 UTC [675] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 15:10:56.049 UTC [93] LOG:  checkpoint starting: time
+2026-10-17 15:11:43.725 UTC [93] LOG:  checkpoint complete: wrote 476 buffers (2.9%), wrote 6 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=47.673 s, sync=0.002 s, total=47.677 s; sync files=164, longest=0.001 s, average=0.001 s; distance=4324 kB, estimate=8202 kB; lsn=0/2F7AC00, redo lsn=0/2DF55B0
+2026-10-17 15:13:26.222 UTC [934] ERROR:  capacity root disposition unavailable
+2026-10-17 15:13:26.222 UTC [934] CONTEXT:  PL/pgSQL function public.read_capacity_root(uuid,jsonb,bytea,bytea) line 10 at RAISE
+2026-10-17 15:13:26.222 UTC [934] STATEMENT:  -- name: ReadCapacityRoot :one
+	SELECT read_capacity_root($1::uuid,$2::jsonb,$3::bytea,$4::bytea)::jsonb AS result
+	
