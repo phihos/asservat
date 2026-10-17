@@ -204,9 +204,17 @@ type operationStep struct {
 	err  error
 }
 
-func (e *operationStep) Error() string     { return e.step }
-func (e *operationStep) Unwrap() error     { return e.err }
-func (e *operationStep) FixedStep() string { return e.step }
+func (e *operationStep) Error() string { return e.step }
+func (e *operationStep) Unwrap() error { return e.err }
+
+// FixedStep appends a nested fixed step, so labels compose across layers.
+func (e *operationStep) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
+}
 
 type hubConnectorOperationProofs struct {
 	hub       *HubConnectorObservationOperation

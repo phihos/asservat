@@ -360,3 +360,15 @@ regional slot.
     (unavailable)`, sometimes right after its first native read. The
     hub-worker's claim sub-steps, the hub-api's claim handler and the hub
     coordinator's operation steps now each log their fixed refusal stage.
+  - [CI run 4](../../test/results/adr197-continuation-ci-4/native-continuation-1/context-storage-environment.json)
+    (run 39032137482): failures are `claim/post` on the hub-worker and
+    `observe` in the hub-api's claim handler. The region completed 13
+    full serves (all four native reads), and several hub failures take
+    about 2.3 s, a whole exchange, so the hub rejects completed exchanges
+    at the end. The holder's claim replaced every inner error with a bare
+    unavailable; it now keeps the coordinator's step, and the step labels
+    compose across layers. The direct-observation suite (CI run
+    39032139352) measured about 135 Kubernetes API calls per regional
+    observation across hub-worker, hub-api and region, with 51 requests
+    spending 76 ms in the API server: most of each 2.4–2.8 s observation
+    is client-side 20 QPS limiting.

@@ -3,6 +3,7 @@ package clusterobservation
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"sync"
 	"time"
 
@@ -279,17 +280,44 @@ func (c *HubObservationOperationClaim) Observe() (fleet.ClusterObservationResult
 	c.calls.Add(1)
 	c.mu.Unlock()
 	result, err := c.conversation.ObserveCluster(c.ctx, c.request.Clone())
-	if c.ctx.Err() != nil || c.entry.stream == nil || !c.entry.stream.completed() {
-		err = fleet.ErrUnavailable
+	switch {
+	case err != nil:
+		err = &holderStep{"conversation", errors.Join(fleet.ErrUnavailable, err)}
+	case c.ctx.Err() != nil:
+		err = &holderStep{"claim-deadline", fleet.ErrUnavailable}
+	case c.entry.stream == nil || !c.entry.stream.completed():
+		err = &holderStep{"stream-incomplete", fleet.ErrUnavailable}
 	}
 	c.calls.Done()
 	c.Close()
 	digest, digestErr := RequestDigest(c.request)
 	result = result.Restrict(c.request.RequestedAt, c.until)
-	if err != nil || digestErr != nil || c.parent.Err() != nil || c.entry.holder.root.Err() != nil || !result.Matches(c.request, digest, c.entry.holder.now()) {
-		return zero, fleet.ErrUnavailable
+	if err != nil {
+		return zero, err
+	}
+	if digestErr != nil || c.parent.Err() != nil || c.entry.holder.root.Err() != nil || !result.Matches(c.request, digest, c.entry.holder.now()) {
+		return zero, &holderStep{"result", fleet.ErrUnavailable}
 	}
 	return result, nil
+}
+
+// holderStep names the fixed claim step that refused, for operator
+// diagnostics (FixedStep); it still matches fleet.ErrUnavailable.
+type holderStep struct {
+	step string
+	err  error
+}
+
+func (e *holderStep) Error() string { return e.step }
+func (e *holderStep) Unwrap() error { return e.err }
+
+// FixedStep appends a nested fixed step, so labels compose across layers.
+func (e *holderStep) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
 }
 
 func (c *HubObservationOperationClaim) shutdown() {
