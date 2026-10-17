@@ -9,9 +9,8 @@ their AI agents.
 > [!WARNING]
 > **Early development: not usable yet.** Sign-in, permission checks, encrypted
 > storage, downloads and a small pod-status capture pass tests against real
-> Kubernetes, PostgreSQL, OpenBao and S3. The other evidence types in the
-> following table are partly built or only designed, and there is no release. See
-> [implementation status](docs/implementation-status.md).
+> Kubernetes, PostgreSQL, OpenBao and S3. The other evidence types are not ready,
+> and there is no release. See [implementation status](docs/implementation-status.md).
 
 ![Design prototype of the Asservat console with open cases, recording health and captures in progress](design/ui/previews/workspace.png)
 <sub>Design prototype with synthetic data.</sub>
@@ -19,65 +18,61 @@ their AI agents.
 ## What you can capture
 
 A pod restart often destroys the evidence you need. Asservat captures it on the
-pod while the problem happens, and you get each piece as an ordinary file for
-the tool you already use:
+pod while the problem happens and gives you each piece in its standard format:
 
-| Evidence | What you get | Open it with | Status |
-| --- | --- | --- | --- |
-| Pod state | Phase, readiness, container counts and restarts, as JSON | Console, any JSON tool | Tested |
-| Logs | Container logs from 30 s before to 10 s after the trigger | Any text tool | Designed |
-| Packet capture | PCAPNG filtered with tcpdump syntax; peers named by Kubernetes Service and Pod | Wireshark, tcpdump | Designed |
-| HTTP headers | Header fields you allow, from captured HTTP traffic, as JSON; never bodies | Console, `jq` | Designed |
-| Core dump | ELF core, plus the matching executable and libraries when available | GDB, LLDB or another debugger | Designed |
-| Runtime profile | Go CPU, heap and mutex profiles and execution traces from the pod's pprof endpoint | `go tool pprof`, `go tool trace` | Partly built |
-| Syscall trace | System calls with timing and results; argument memory is not read by default | Console, AI agent queries | Designed |
-| Files and commands | Files and `/proc` entries from the pod, and the output of commands you define | Any tool | Designed |
+| Evidence | What you get | Recorded |
+| --- | --- | --- |
+| Pod state | Phase, readiness, container counts and restarts, as JSON | On trigger |
+| Logs | Container logs around the trigger, over a window you set | On trigger |
+| Packet capture | PCAPNG filtered with tcpdump syntax; peers named by Kubernetes Service and Pod. Packet headers by default, full payloads with payload approval | Continuously |
+| HTTP headers | Header fields you allow, as JSON, for live views and AI agents without payload approval. Bodies come with the full packet capture | Continuously |
+| Core dump | ELF core, plus the matching executable and libraries when available | On trigger |
+| Runtime profile | Go CPU, heap and mutex profiles and execution traces from the pod's pprof endpoint | On trigger |
+| Syscall trace | System calls with timing and results; argument memory is not read by default | Continuously |
+| Files and commands | Files and `/proc` entries from the pod, and the output of commands you define | On trigger |
 
-Packet and syscall recorders can run continuously in a rolling buffer, so when a
-trigger fires, the saved recording also covers the seconds *before* it. Every download shows its
-SHA-256 checksum and states what the capture missed. *Tested*: passes tests
-against real services. *Partly built*: acquisition works, the end-to-end path
-does not.
+**Continuously:** the recorder keeps a rolling buffer, so a trigger saves the
+seconds before it as well as after. **On trigger:** the action runs when the
+trigger fires.
 
 ## Why Asservat
 
 - **Captures on its own.** A policy triggers on log patterns, failed probes,
   crashes, resource thresholds or external alerts.
 - **Built for AI coding agents.** Agents find and query evidence over MCP (Model
-  Context Protocol), with your permissions. Asservat contains no AI model.
+  Context Protocol), with your permissions.
 - **Uses your Kubernetes permissions.** Access follows namespaces, RBAC and
-  pod-exec rights; manage it with `kubectl` or GitOps.
+  pod-exec rights.
 - **Safe in production.** Per-workload size and rate limits, approval for
   intrusive captures, encryption on the node and retention limits set by
   administrators. Workloads keep Pod Security `restricted`.
-- **Watch live.** Follow a running packet or syscall recording and save the last
-  30 seconds.
+- **Watch live.** Follow a running packet or syscall recording and save it
+  before the rolling buffer overwrites it.
 - **Self-hosted.** One installation serves many clusters. No telemetry, SaaS or
   licence keys.
 
 ## How it works
 
-Evidence is encrypted on the node and stays in the cluster where it was
-captured. The central hub keeps the catalog, approvals and audit log. Each
-cluster's connector dials out to the hub, so the hub needs no credentials for
-your clusters.
+A policy in the workload cluster says what to record and when. Node collectors
+keep the continuous recorders running; when a trigger fires, they save the
+recorder window and run the on-trigger actions. Evidence is encrypted on the node
+and stays in that cluster's object store. The hub keeps only the catalog,
+approvals and audit log, and each cluster's connector dials out to it.
 
 ```mermaid
 flowchart LR
-    User["You or your AI agent"] -->|"sign in (OIDC)"| Hub
-    subgraph Central["Central cluster"]
-        Hub["Hub<br/>console · MCP · catalog · audit"]
-        DB[("PostgreSQL")]
-        Hub --- DB
-    end
     subgraph Workload["Each workload cluster"]
-        Conn["Connector"]
-        Node["Collectors on each node"]
-        Store[("Encrypted evidence")]
-        Conn --> Node
-        Node --> Store
+        direction LR
+        Policy["Policy"] --> Controller["Controller<br/>checks rights, limits<br/>and approvals"]
+        Controller --> Collector["Node collector<br/>runs the recorders"]
+        Trigger(["Trigger<br/>crash · log match ·<br/>probe · alert"]) --> Collector
+        Collector -->|"saves the window,<br/>runs on-trigger actions"| Encrypt["Encrypt<br/>on the node"]
+        Encrypt --> Store[("Object store")]
     end
-    Hub ---|"connector dials out (mTLS)"| Conn
+    subgraph Central["Hub"]
+        Catalog["Catalog, approvals,<br/>audit"] --> Access["Console · MCP ·<br/>downloads"]
+    end
+    Store -->|"evidence reference,<br/>via the connector"| Catalog
 ```
 
 Read more in [architecture](docs/architecture.md) and the
@@ -123,10 +118,10 @@ spec:
 ```
 
 When an `api` pod restarts, fails its liveness probe or logs `panic:`, Asservat
-saves up to 13 MiB of encrypted evidence: the pod's Kubernetes state and events,
-process status, network sockets, and logs from 30 seconds before to 10 seconds
-after the trigger. [More examples](examples/README.md) add packet captures,
-profiles and core dumps.
+saves up to 13 MiB of encrypted evidence with the preset's defaults: the pod's
+Kubernetes state and events, process status, network sockets, and logs from 30
+seconds before to 10 seconds after the trigger.
+[More examples](examples/README.md) add packet captures, profiles and core dumps.
 
 ## Learn more
 
