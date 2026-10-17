@@ -21,10 +21,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
+      # Full checkout: spec-check verifies documentation links into test/results.
       - uses: actions/checkout@v7
-        with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
       - uses: ./.github/actions/setup
         with: { helm: "true" }
+      # docs/validation.md: openapi-check's validator is a development-only extra.
+      - run: pip install --disable-pip-version-check -q openapi-spec-validator==0.9.0
       - name: Specification, architecture, schema and Helm gates
         run: >-
           make -k -j4 -O
