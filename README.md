@@ -19,8 +19,9 @@ their AI agents.
 ## What you can capture
 
 When a container restarts, its process memory, `/proc` state and the files it
-wrote outside its volumes are gone. Network traffic and system calls are never
-stored unless something records them. Asservat captures this evidence on the pod
+wrote outside its volumes are gone. When the pod is replaced, its `emptyDir`
+volumes go too, memory-backed ones included. Network traffic and system calls
+are never stored unless something records them. Asservat captures this evidence on the pod
 while the problem happens, and you get each piece as an ordinary file for the
 tool you already use:
 
