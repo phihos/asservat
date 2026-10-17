@@ -132,27 +132,30 @@ var errWatchBehind = errors.New("permission watch has not reached current comple
 func (s *bindingRun) refresh(ctx context.Context) error {
 	first, err := s.r.trust(ctx)
 	if err != nil {
-		return err
+		return reconcileStep("trust", err)
 	}
 	snapshot, err := s.guardedSnapshot(ctx, first)
 	if err != nil {
-		return err
+		return reconcileStep("snapshot", err)
 	}
 	if err = s.journal.Confirm(snapshot, s.r.Now()); err != nil {
 		// Do not replace a journal with a newer LIST and thereby skip an
 		// intermediate owner. Process queued events, then retry the full LIST.
 		if !s.r.Now().Before(s.journal.until) {
-			return value.ErrUnavailable
+			return reconcileStep("confirm-expired", value.ErrUnavailable)
 		}
 		return errWatchBehind
 	}
 	if s.fence.LeaseUntil.Sub(s.r.Now()) < 10*time.Second {
 		s.fence, err = s.r.Store.RenewPermissions(ctx, s.fence)
 		if err != nil {
-			return err
+			return reconcileStep("renew", err)
 		}
 	}
-	return s.accept(ctx, true)
+	if err = s.accept(ctx, true); err != nil {
+		return reconcileStep("accept", err)
+	}
+	return nil
 }
 
 // Run keeps event delivery bounded to one queued transition and processes each
@@ -174,14 +177,14 @@ func (r BindingReconciler) Run(ctx context.Context) error {
 		}
 	}()
 	if err := s.start(ctx); err != nil {
-		return err
+		return reconcileStep("start", err)
 	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
 		watch, err := r.Watcher.WatchBindings(ctx, s.journal.Cursor())
 		if err != nil {
-			return err
+			return reconcileStep("watch", err)
 		}
 		err = s.consume(ctx, watch, ticker.C)
 		if !errors.Is(err, io.EOF) {
@@ -218,20 +221,43 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 			return ctx.Err()
 		case <-ticks:
 			if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
-				return err
+				return reconcileStep("refresh", err)
 			}
 		case item := <-queue:
 			if item.err != nil {
-				return item.err
+				if errors.Is(item.err, io.EOF) {
+					return item.err
+				}
+				return reconcileStep("watch-next", item.err)
 			}
 			if err := s.journal.Apply(item.event); err != nil {
-				return err
+				return reconcileStep("apply", err)
 			}
 			if item.event.Type != "BOOKMARK" {
 				if err := s.accept(ctx, false); err != nil {
-					return err
+					return reconcileStep("accept", err)
 				}
 			}
 		}
 	}
+}
+
+// reconcileStepError names the phase that stopped a permission epoch; the
+// hub-worker logs it (ADR-197 runs 23a/23b: repeated stops, no cause). Labels
+// compose with nested fixed steps.
+type reconcileStepError struct {
+	step string
+	err  error
+}
+
+func reconcileStep(step string, err error) error { return &reconcileStepError{step, err} }
+
+func (e *reconcileStepError) Error() string { return e.step }
+func (e *reconcileStepError) Unwrap() error { return e.err }
+func (e *reconcileStepError) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
 }

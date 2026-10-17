@@ -1,0 +1,200 @@
+2026-10-17 21:49:15.733 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:15.733 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:15.733 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:17.329 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:17.329 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:17.329 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:19.541 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:19.541 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:19.541 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:20.617 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:20.617 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:20.617 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:21.699 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:21.699 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:21.699 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:23.936 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:23.936 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:23.936 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:25.015 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:25.015 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:25.015 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:29.078 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:29.078 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:29.078 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:32.606 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:32.606 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:32.606 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:33.682 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:33.682 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:33.682 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:34.769 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:34.769 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:34.769 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:35.851 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:35.851 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:35.851 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:38.075 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:38.075 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:38.075 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:39.153 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:39.153 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:39.153 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:40.236 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:40.236 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:40.236 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:41.322 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:41.322 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:41.322 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:42.398 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:42.398 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:42.398 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:44.629 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:44.629 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:44.629 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:45.857 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:45.857 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:45.857 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:47.290 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:47.290 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:47.290 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:48.388 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:48.388 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:48.388 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:49.465 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:49.465 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:49.465 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:51.704 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:51.704 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:51.704 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:52.944 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:52.944 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:52.944 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:54.020 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:54.020 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:54.020 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:55.100 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:55.100 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:55.100 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:57.329 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:57.329 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:57.329 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:58.540 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:58.540 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:58.540 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:49:59.623 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:49:59.623 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:49:59.623 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:00.719 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:00.719 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:00.719 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:01.799 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:01.799 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:01.799 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:04.025 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:04.025 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:04.025 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:05.240 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:05.240 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:05.240 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:06.345 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:06.345 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:06.345 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:07.425 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:07.425 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:07.425 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:08.503 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:08.503 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:08.503 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:10.735 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:10.735 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:10.735 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:11.937 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:11.937 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:11.937 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:13.023 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:13.023 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:13.023 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
+2026-10-17 21:50:14.106 UTC [996] ERROR:  capacity source acceptance unavailable
+2026-10-17 21:50:14.106 UTC [996] CONTEXT:  PL/pgSQL function public.accept_capacity_source(uuid,bigint,jsonb,jsonb,jsonb,uuid,bytea) line 22 at RAISE
+2026-10-17 21:50:14.106 UTC [996] STATEMENT:  -- name: AcceptCapacitySource :one
+	SELECT accept_capacity_source($1::uuid,$2::bigint,$3::jsonb,$4::jsonb,$5::jsonb,$6::uuid,$7::bytea)::jsonb AS acceptance
+	
