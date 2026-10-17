@@ -211,7 +211,12 @@ func (r *regionalCapacity) standbys(ctx context.Context, client *mtls.ConnectorO
 		if errors.As(err, &step) {
 			cause = stage + "/" + regionalOutcome(err)
 		}
-		if err != nil && cause != last {
+		// A served standby's failure is logged every time with its elapsed
+		// time, so window exhaustion is visible; open failures per change.
+		if err != nil && (opened || cause != last) {
+			if opened {
+				cause += " after " + time.Since(started).Round(10*time.Millisecond).String()
+			}
 			fmt.Fprintln(os.Stderr, "regional capacity standby: "+cause)
 			last = cause
 		}

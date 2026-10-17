@@ -389,3 +389,12 @@ regional slot.
     the hub's owner candidates and verifies the hub owner's proof through
     its own lifecycle reads. The region's probe answer, producer setup and
     serve loop now carry fixed steps, and its standby log prints the chain.
+  - [CI run 7](../../test/results/adr197-continuation-ci-7/native-continuation-1/context-storage-environment.json)
+    (run 39037953153): the region names `serve/answer` in ten failed
+    serves. In the event order, most follow a successful native read 4
+    (510–600 ms for its 22 calls) or read 3, so the region refuses after
+    its reads, about two seconds into the exchange, in the answer's
+    window or key check. That matches window exhaustion under the 20 QPS
+    limiters. The connection layer had flattened the channel's step; it
+    now passes it through, the answer distinguishes `window` from `keys`,
+    and each failed serve logs its elapsed time.

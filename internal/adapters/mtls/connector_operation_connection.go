@@ -180,8 +180,11 @@ func (s *ConnectorObservationOperationConnection) AnswerConnectorObservation(ctx
 	success := false
 	defer func() { finish(success) }()
 	out, err := s.channel.AnswerConnectorObservation(call, p)
-	if err != nil || !s.restrict(call, identity.Earlier(ownerObservationTime(out.NativeUntil), identity.Earlier(ownerObservationTime(out.SourceFreshUntil), ownerObservationTime(out.WorkloadFreshUntil)))) {
-		return contracts.ConnectorObservationOperationReply{}, value.ErrUnavailable
+	if err != nil {
+		return contracts.ConnectorObservationOperationReply{}, answerStep("channel", value.ErrUnavailable, err)
+	}
+	if !s.restrict(call, identity.Earlier(ownerObservationTime(out.NativeUntil), identity.Earlier(ownerObservationTime(out.SourceFreshUntil), ownerObservationTime(out.WorkloadFreshUntil)))) {
+		return contracts.ConnectorObservationOperationReply{}, answerStep("restrict", value.ErrUnavailable, nil)
 	}
 	success = true
 	return out, nil
@@ -195,8 +198,11 @@ func (s *ConnectorObservationOperationConnection) ObserveCluster(ctx context.Con
 	success := false
 	defer func() { finish(success) }()
 	out, err := s.channel.ObserveCluster(call, r)
-	if err != nil || !s.restrict(call, out.Interval.FreshUntil) {
-		return value.ClusterObservationResult{}, value.ErrUnavailable
+	if err != nil {
+		return value.ClusterObservationResult{}, answerStep("channel", value.ErrUnavailable, err)
+	}
+	if !s.restrict(call, out.Interval.FreshUntil) {
+		return value.ClusterObservationResult{}, answerStep("restrict", value.ErrUnavailable, nil)
 	}
 	success = true
 	return out, nil

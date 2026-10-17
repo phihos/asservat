@@ -252,7 +252,11 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 	currentKeys, stopCurrent := context.WithDeadline(bounded, c.until)
 	defer stopCurrent()
 	if c.closed || c.failed || c.ctx.Err() != nil || !c.now().Before(c.until) || c.producer.credentials.observationKeysCurrent(currentKeys, c.keys) != nil {
-		return zero, answerStep("keys", value.ErrUnavailable, nil)
+		step := "keys"
+		if !c.now().Before(c.until) {
+			step = "window"
+		}
+		return zero, answerStep(step, value.ErrUnavailable, nil)
 	}
 	reply.NativeUntil = c.until.UTC().Format(time.RFC3339Nano)
 	reply.SourceFreshUntil = identity.Earlier(ownerObservationTime(reply.SourceFreshUntil), c.until).UTC().Format(time.RFC3339Nano)
