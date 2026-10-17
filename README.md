@@ -48,6 +48,8 @@ trigger fires.
   administrators. Workloads keep Pod Security `restricted`.
 - **Watch live.** Follow a running packet or syscall recording and save it
   before the rolling buffer overwrites it.
+- **Shows what it missed.** Each capture reports dropped packets, truncation and
+  other gaps, and each download carries its SHA-256 checksum.
 - **Self-hosted.** One installation serves many clusters. No telemetry, SaaS or
   licence keys.
 
