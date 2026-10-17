@@ -1,6 +1,8 @@
 # ADR-201 — eBPF CPU profiles for every runtime
 
-Date: 2026-10-17. Status: accepted; design only, no adapter implemented.
+Date: 2026-10-17. Status: accepted as design; no adapter implemented. The
+`ebpfSampler` capability stays unavailable until the adapter, kernel and
+overhead qualification pass; this ADR makes no overhead claim.
 Requirements: REQ-PRF-001/002/003; first-class runtime profiles (product decision).
 Amends the capability catalogue in [profiles](../../specs/profiles.md).
 
@@ -16,7 +18,8 @@ Grafana Alloy's `pyroscope.ebpf` profiles every process on a node from the
 kernel, across interpreted and JIT runtimes, without loading anything into the
 target. It uses the OpenTelemetry eBPF profiler
 (`go.opentelemetry.io/ebpf-profiler`, contributed by Elastic; Alloy pins a
-Grafana fork). Research, read 2026-10-17:
+Grafana fork). The [research note](../research/ebpf-profiler.md) records the
+sources; in short:
 
 - **Coverage:** native code (`.eh_frame` unwinding, no frame pointers needed),
   Go (`.gopclntab`), HotSpot JDK 7+, Python 3.6–3.14, Node.js V8 8.1+,
@@ -75,7 +78,8 @@ Sources: the [profiler](https://github.com/open-telemetry/opentelemetry-ebpf-pro
    approved external-profiler parameters, never defaults.
 6. **Approval and limits are unchanged.** The eBPF session is live profiling,
    classified intrusive for approval and budget, with REQ-PRF-002's duration and
-   output limits. Only one Asservat eBPF session runs per node at a time.
+   output limits. Only one Asservat eBPF session runs per node at a time; a
+   second request on that node returns `ProfilerBusy` (SC-PRF-002).
 
 ## Consequences
 

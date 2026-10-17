@@ -44,7 +44,7 @@ The shared [assessment](capture-assessment.md) considers runtime/options, sampli
 
 ### SC-PRF-002
 
-Given an existing application CPU profiler, when Asservat requests a conflicting profile, then it returns `ProfilerBusy` without terminating that session. A heap request leaves GC behavior unchanged unless its policy grant explicitly authorizes forcing GC.
+Given an existing application CPU profiler, when Asservat requests a conflicting profile, then it returns `ProfilerBusy` without terminating that session. A heap request leaves GC behavior unchanged unless its policy grant explicitly authorizes forcing GC. Given an eBPF sampler session already running on a node, a second `ebpfSampler` request for any pod on that node returns `ProfilerBusy`; a request on another node is unaffected.
 
 ## REQ-PRF-003 — Format, identity and pre-analysis
 
