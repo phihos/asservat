@@ -2,6 +2,7 @@ package capacity
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -131,6 +132,11 @@ func TestCapacityWorkReconcilerRechecksDiscoveryAndEveryOriginalDeadline(t *test
 				}
 			} else if err == nil {
 				t.Fatal("changed, unknown, canceled or expired facts succeeded", store.calls)
+			}
+			stages := map[string]string{"foreign-guard": "guard-pin", "unapproved-key": "guard-pin", "workload-replaced": "workload", "observe": "refresh-fresh"}
+			var step interface{ FixedStep() string }
+			if want, ok := stages[mode]; ok && (!errors.As(err, &step) || step.FixedStep() != want || !errors.Is(err, cfg.ErrUnavailable)) {
+				t.Fatal("refusal does not name its stage", err, want)
 			}
 			if !slices.Equal(store.calls, want) || !sameEnrollment(original, *store.row) {
 				t.Fatal("unexpected phase or original enrollment changed", store.calls, want)

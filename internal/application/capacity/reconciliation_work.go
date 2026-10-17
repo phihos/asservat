@@ -32,7 +32,22 @@ type CapacityClusterReaders struct {
 	// about a hundred hub-side API calls, so its cluster never retries
 	// back-to-back (ADR-197); zero keeps the local cluster's cadence.
 	Pace time.Duration
+	// Report, when set, receives each workload reconciliation's outcome and
+	// elapsed time. A refusal names its fixed stage (FixedStep).
+	Report func(error, time.Duration)
 }
+
+// capacityStageError names the fixed ReconcileWorkload stage that refused.
+type capacityStageError struct {
+	stage string
+	err   error
+}
+
+func (e *capacityStageError) Error() string     { return e.stage }
+func (e *capacityStageError) Unwrap() error     { return e.err }
+func (e *capacityStageError) FixedStep() string { return e.stage }
+
+func capacityStage(stage string, err error) error { return &capacityStageError{stage, err} }
 
 // CapacityGuardedWorkloadReader observes the namespace guard and one
 // workload under exactly the given keys, as one observation.
@@ -136,61 +151,75 @@ func (s *CapacityWorkReconciler) ReconcileRoot(ctx context.Context, source Accep
 
 func (s *CapacityWorkReconciler) ReconcileWorkload(ctx context.Context, source AcceptedCapacitySource, cluster CapacityClusterReaders, namespace cfg.NamespaceRef, candidate cfg.WorkloadRef) error {
 	if !s.sourceValid(source) || s.Permissions == nil || s.Enrollment == nil || s.Enrollment.Accounts == nil || s.Bindings == nil || cluster.Workloads == nil || cluster.Guard == nil {
-		return cfg.ErrUnavailable
+		return capacityStage("inputs", cfg.ErrUnavailable)
 	}
 	pin := s.namespacePin(cluster.ClusterID)
 	if pin == nil {
-		return cfg.ErrUnavailable
+		return capacityStage("pin", cfg.ErrUnavailable)
 	}
 	l, err := newCapacityWorkInterval(ctx, source, s.Now)
 	if err != nil {
-		return err
+		return capacityStage("interval", err)
 	}
 	defer func() { l.end() }()
 	recovery, err := s.Recovery.RecoveryState(l.ctx)
 	if err != nil || !recovery.Valid(s.Now()) || recovery.InstallationID != source.InstallationID || !l.narrow(recovery.FreshUntil) {
-		return cfg.ErrUnavailable
+		return capacityStage("recovery", cfg.ErrUnavailable)
 	}
 	permissions, err := s.Permissions.ReadCapacityPermissions(l.ctx, recovery)
 	if err != nil || !permissions.Valid(s.Now()) || permissions.RootID != source.RootID || !l.narrow(permissions.FreshUntil) {
-		return cfg.ErrUnavailable
+		return capacityStage("permissions", cfg.ErrUnavailable)
 	}
 	var guard CapacityNamespaceProtection
 	var workload CapacityWorkloadObservation
 	if cluster.Guarded != nil {
 		guard, workload, err = cluster.Guarded.ReadCapacityGuardedWorkload(l.ctx, namespace, candidate, pin.Keys)
 		if err != nil {
-			return cfg.ErrUnavailable
+			return capacityStage("guarded-read", cfg.ErrUnavailable)
 		}
 	} else if guard, err = cluster.Guard.CapacityNamespaceProtection(l.ctx); err != nil {
-		return cfg.ErrUnavailable
+		return capacityStage("guard-read", cfg.ErrUnavailable)
 	}
-	if !guard.Valid(s.Now()) || guard.ClusterID != pin.ClusterID || guard.Digest != pin.Digest || !slices.Equal(guard.Keys, pin.Keys) || !l.narrow(guard.FreshUntil) {
-		return cfg.ErrUnavailable
+	if !guard.Valid(s.Now()) || guard.ClusterID != pin.ClusterID || guard.Digest != pin.Digest || !slices.Equal(guard.Keys, pin.Keys) {
+		return capacityStage("guard-pin", cfg.ErrUnavailable)
+	}
+	if !l.narrow(guard.FreshUntil) {
+		return capacityStage("guard-fresh", cfg.ErrUnavailable)
 	}
 	if cluster.Guarded == nil {
 		workload, err = cluster.Workloads.ReadCapacityWorkload(l.ctx, namespace, candidate, guard.Keys)
 	}
-	if err != nil || !workload.Valid(s.Now()) || workload.Namespace.ClusterID != cluster.ClusterID || workload.Namespace.Namespace != namespace || workload.Workload != candidate || !l.narrow(workload.FreshUntil) || !l.narrow(workload.Namespace.FreshUntil) {
-		return cfg.ErrUnavailable
+	if err != nil || !workload.Valid(s.Now()) || workload.Namespace.ClusterID != cluster.ClusterID || workload.Namespace.Namespace != namespace || workload.Workload != candidate {
+		return capacityStage("workload", cfg.ErrUnavailable)
+	}
+	if !l.narrow(workload.FreshUntil) || !l.narrow(workload.Namespace.FreshUntil) {
+		return capacityStage("workload-fresh", cfg.ErrUnavailable)
 	}
 	observation, _, err := ComposeEnrollmentObservation(source, guard, workload, permissions, recovery, s.Enrollment.Accounts.AccountVersion(), s.Now())
 	if err != nil {
-		return err
+		return capacityStage("compose", err)
 	}
 	if !l.narrow(observation.FreshUntil) {
-		return cfg.ErrUnavailable
+		return capacityStage("observation-fresh", cfg.ErrUnavailable)
 	}
 	enrolled, err := s.Enrollment.Reconcile(l.ctx, observation)
-	if err != nil || !l.narrow(observation.FreshUntil) {
-		return cfg.ErrUnavailable
+	if err != nil {
+		return capacityStage("enroll", cfg.ErrUnavailable)
+	}
+	if !l.narrow(observation.FreshUntil) {
+		return capacityStage("enroll-fresh", cfg.ErrUnavailable)
 	}
 	// Completed enrollment remains a historical receipt. A new independent
 	// workload observation must explicitly refresh the existing binding; it
 	// cannot overwrite original phase facts or acquire replacement account IDs.
-	err = s.Bindings.RefreshCapacityEnrollment(l.ctx, observation, enrolled)
-	if !l.narrow(observation.FreshUntil) {
-		return cfg.ErrUnavailable
+	if err = s.Bindings.RefreshCapacityEnrollment(l.ctx, observation, enrolled); err != nil {
+		if !l.narrow(observation.FreshUntil) {
+			return capacityStage("refresh-fresh", cfg.ErrUnavailable)
+		}
+		return capacityStage("refresh", err)
 	}
-	return err
+	if !l.narrow(observation.FreshUntil) {
+		return capacityStage("refresh-fresh", cfg.ErrUnavailable)
+	}
+	return nil
 }

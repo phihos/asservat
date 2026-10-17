@@ -204,7 +204,11 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 				until, _ := call.Deadline()
 				live, end := context.WithDeadline(original, until)
 				defer end()
-				_ = s.Work.ReconcileWorkload(live, v, s.Clusters[i], ns, candidate)
+				started := s.Work.Now()
+				err := s.Work.ReconcileWorkload(live, v, s.Clusters[i], ns, candidate)
+				if report := s.Clusters[i].Report; report != nil {
+					report(err, s.Work.Now().Sub(started))
+				}
 			}
 		})
 	}()

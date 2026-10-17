@@ -31,6 +31,30 @@ type capacityRemoteObservation struct {
 	diagnose bool
 	mu       sync.Mutex
 	last     string
+	workload string
+}
+
+// regionalOutcome is "ok" or the error's fixed step and closed cause.
+func regionalOutcome(err error) string {
+	if err == nil {
+		return "ok"
+	}
+	var step interface{ FixedStep() string }
+	if errors.As(err, &step) {
+		return step.FixedStep() + " (" + regionalCause(err) + ")"
+	}
+	return regionalCause(err)
+}
+
+// reportWorkload logs one regional workload reconciliation outcome per change
+// with its elapsed time (ADR-197): which enrollment stage refused, if any.
+func (s *capacityRemoteObservation) reportWorkload(err error, elapsed time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if outcome := regionalOutcome(err); outcome != s.workload {
+		s.workload = outcome
+		fmt.Fprintf(os.Stderr, "capacity regional workload: %s after %s\n", outcome, elapsed.Round(10*time.Millisecond))
+	}
 }
 
 // capacityClusterExchange is the installed v1 local client or, for a
@@ -77,16 +101,8 @@ func (s *capacityRemoteObservation) observe(ctx context.Context, r fleet.Cluster
 		result, err = capacityCheckedObservation(r, result, until, s.now())
 	}
 	if s.diagnose {
-		outcome := "ok"
-		if err != nil {
-			outcome = regionalCause(err)
-			var step interface{ FixedStep() string }
-			if errors.As(err, &step) {
-				outcome = step.FixedStep() + " (" + outcome + ")"
-			}
-		}
 		s.mu.Lock()
-		if line := string(r.Purpose) + ": " + outcome; line != s.last {
+		if line := string(r.Purpose) + ": " + regionalOutcome(err); line != s.last {
 			s.last = line
 			fmt.Fprintf(os.Stderr, "capacity regional observation %s after %s\n", line, s.now().Sub(started).Round(10*time.Millisecond))
 		}

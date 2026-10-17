@@ -133,7 +133,7 @@ func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, 
 				return nil, nil, e
 			}
 			read.diagnose = true
-			out = append(out, app.CapacityClusterReaders{ClusterID: q.ClusterID, Workloads: read, Guard: read, Guarded: read, Pace: 2 * time.Second})
+			out = append(out, app.CapacityClusterReaders{ClusterID: q.ClusterID, Workloads: read, Guard: read, Guarded: read, Pace: 2 * time.Second, Report: read.reportWorkload})
 		}
 	}
 	d.qualifications = qualifications
