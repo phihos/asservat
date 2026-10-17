@@ -2,6 +2,7 @@ package capacity
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -51,17 +52,20 @@ func (s *CapacitySourceObserver) Observe(ctx context.Context) (AcceptedCapacityS
 		}
 		return live.Err() == nil && s.Now().Before(until)
 	}
+	// Fixed step labels name the refusing phase (ADR-197 CI continuation
+	// run 18b lost its source without any logged cause).
+	stage := func(step string, e error) error { return capacityStage(step, errors.Join(cfg.ErrUnavailable, e)) }
 	r, e := s.Recovery.RecoveryState(live)
 	if e != nil || !r.Valid(s.Now()) || r.InstallationID != s.InstallationID || !narrow(r.FreshUntil) {
-		return zero, cfg.ErrUnavailable
+		return zero, stage("recovery", e)
 	}
 	revision, e := s.Journal.ReadCapacitySourceRevision(live, r)
 	if e != nil || revision < 0 || revision >= 1<<60 || !narrow(until) {
-		return zero, cfg.ErrUnavailable
+		return zero, stage("revision", e)
 	}
 	// Failure can only fence the observed CAS sequence, within this invocation's
 	// original interval. Losing that CAS never suppresses a later accepted read.
-	failed := func() (AcceptedCapacitySource, error) {
+	failed := func(step string, e error) (AcceptedCapacitySource, error) {
 		if live.Err() == nil && r.Valid(s.Now()) && s.Now().Before(until) {
 			at := started
 			if at.Nanosecond()%1000 != 0 {
@@ -72,26 +76,26 @@ func (s *CapacitySourceObserver) Observe(ctx context.Context) (AcceptedCapacityS
 				_ = s.Journal.InvalidateCapacitySource(live, s.RootID, revision, r, at, end)
 			}
 		}
-		return zero, cfg.ErrUnavailable
+		return zero, stage(step, e)
 	}
 	protection, e := s.Protection.CapacityProtection(live)
 	if e != nil || !protection.Valid(s.Now()) || !narrow(protection.FreshUntil) {
-		return failed()
+		return failed("protection", e)
 	}
 	observation, e := s.Source.ReadCapacitySource(live)
 	if e != nil || !observation.Valid(s.Now()) || !narrow(observation.Snapshot.FreshUntil) {
-		return failed()
+		return failed("read", e)
 	}
 	input := CapacitySourceAcceptance{RootID: s.RootID, InstallationID: s.InstallationID, QualificationID: s.QualificationID, QualificationDigest: s.QualificationDigest, ExpectedRevision: revision, Observation: observation, Protection: protection, Recovery: r}
 	if !input.Valid(s.Now()) || live.Err() != nil {
-		return failed()
+		return failed("input", live.Err())
 	}
 	out, e := s.Journal.AcceptCapacitySource(live, input)
 	if e != nil {
-		return zero, cfg.ErrUnavailable
+		return zero, stage("accept", e)
 	} // unknown commit remains lookup/CAS-only
 	if !out.Valid(s.Now()) || out.RootID != s.RootID || out.InstallationID != s.InstallationID || out.QualificationID != s.QualificationID || out.QualificationDigest != s.QualificationDigest || out.ProtectionDigest != protection.Digest || out.Observation.Digest != observation.Digest || out.Revision < revision || out.Revision > revision+1 || out.FreshUntil.After(until) || out.ObservedAt.Before(protection.ObservedAt) || out.ObservedAt.Before(r.ObservedAt) || !narrow(out.FreshUntil) {
-		return zero, cfg.ErrUnavailable
+		return zero, stage("result", nil)
 	}
 	return out, nil
 }

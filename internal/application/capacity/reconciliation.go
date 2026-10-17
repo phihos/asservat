@@ -19,7 +19,10 @@ type CapacityReconciler struct {
 	Source   *CapacitySourceObserver
 	Work     *CapacityWorkReconciler
 	Clusters []CapacityClusterReaders
-	running  atomic.Bool
+	// SourceReport, when set, receives each source observation's outcome
+	// (nil on success) from the single source loop. Diagnostics only.
+	SourceReport func(error)
+	running      atomic.Bool
 }
 
 // CapacitySourceInvocation is only the existing source invocation boundary.
@@ -147,8 +150,17 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 				reader = s.Source
 			}
 			v, err := reader.Observe(call)
-			if err != nil || call.Err() != nil || current.publish(root, v, s.Work.Now()) != nil {
+			if err == nil {
+				err = call.Err()
+			}
+			if err == nil {
+				err = current.publish(root, v, s.Work.Now())
+			}
+			if err != nil {
 				current.clear()
+			}
+			if s.SourceReport != nil {
+				s.SourceReport(err)
 			}
 		}
 		if source == nil {

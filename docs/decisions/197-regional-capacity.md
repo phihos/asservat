@@ -485,3 +485,14 @@ regional slot.
     failed qualification read as no change and did not log it, so the run
     cannot show why. The read now names its step (`query`,
     `query-timeout`) and the watcher logs each change of outcome.
+  - [CI runs 18a/18b](../../test/results/adr197-continuation-ci-18b/native-continuation-1/context-storage-environment.json)
+    (39058402129, 39058408756): 18a passed like 17b. In 18b the hub-worker
+    picked up the joined cluster and every guarded observation succeeded
+    in about 2.2 s, but after one early `not-allocated` refusal each
+    workload attempt found no current capacity source (`source`), and
+    PostgreSQL refused `accept_capacity_source` 39 times in 52 s while the
+    hub-worker's retention reconciler also failed to begin transactions.
+    The source loop discarded its errors. Its observer now labels each
+    phase (`recovery`, `revision`, `protection`, `read`, `input`,
+    `accept`, `result`) and the hub-worker logs each change of outcome.
+    So far two of four runs on the read-first path pass.

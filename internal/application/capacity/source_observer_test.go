@@ -126,8 +126,18 @@ func TestCapacitySourceObserverFailureFencesOnlyObservedCAS(t *testing.T) {
 		t.Run(phase, func(t *testing.T) {
 			s, f := capacityObserverTestFixture()
 			f.fail = phase
-			if _, e := s.Observe(context.Background()); !errors.Is(e, cfg.ErrUnavailable) {
+			_, e := s.Observe(context.Background())
+			if !errors.Is(e, cfg.ErrUnavailable) {
 				t.Fatalf("phase error lost: %v", e)
+			}
+			// The source fixture phase is labelled "read" in diagnostics.
+			label := map[string]string{"source": "read"}[phase]
+			if label == "" {
+				label = phase
+			}
+			var step interface{ FixedStep() string }
+			if !errors.As(e, &step) || step.FixedStep() != label {
+				t.Fatalf("phase %s labelled %v", phase, e)
 			}
 			want := 0
 			if phase == "protection" || phase == "source" {
