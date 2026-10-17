@@ -41,8 +41,8 @@ trigger fires.
   crashes, resource thresholds or external alerts.
 - **Built for AI coding agents.** Agents find and query evidence over MCP (Model
   Context Protocol), with your permissions.
-- **Uses your Kubernetes permissions.** Access follows namespaces, RBAC and
-  pod-exec rights.
+- **Uses your Kubernetes permissions.** Access is granted with Kubernetes
+  resources and can be inherited from namespace ownership or pod-exec rights.
 - **Safe in production.** Per-workload size and rate limits, approval for
   intrusive captures, encryption on the node and retention limits set by
   administrators. Workloads keep Pod Security `restricted`.
@@ -56,17 +56,20 @@ trigger fires.
 A policy in the workload cluster says what to record and when. Node collectors
 keep the continuous recorders running; when a trigger fires, they save the
 recorder window and run the on-trigger actions. Evidence is encrypted on the node
-and stays in that cluster's object store. The hub keeps only the catalog,
+and stays in its region's object store. The hub keeps only the catalog,
 approvals and audit log, and each cluster's connector dials out to it.
 
 ```mermaid
 flowchart LR
-    subgraph Workload["Each workload cluster"]
+    subgraph Region["Each region"]
         direction LR
-        Policy["Policy"] --> Controller["Controller<br/>checks rights, limits<br/>and approvals"]
-        Controller --> Collector["Node collector<br/>runs the recorders"]
-        Trigger(["Trigger<br/>crash · log match ·<br/>probe · alert"]) --> Collector
-        Collector -->|"saves the window,<br/>runs on-trigger actions"| Encrypt["Encrypt<br/>on the node"]
+        subgraph Workload["Workload cluster"]
+            direction LR
+            Policy["Policy"] --> Controller["Controller<br/>checks rights, limits<br/>and approvals"]
+            Controller --> Collector["Node collector<br/>runs the recorders"]
+            Trigger(["Trigger<br/>crash · log match ·<br/>probe · alert"]) --> Collector
+            Collector -->|"saves the window,<br/>runs on-trigger actions"| Encrypt["Encrypt<br/>on the node"]
+        end
         Encrypt --> Store[("Object store")]
     end
     subgraph Central["Hub"]
