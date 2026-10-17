@@ -45,6 +45,7 @@ type ConnectorObservationOperationChannel struct {
 	lastOwner                            *ownerOperationObservation
 	digest                               artifact.Digest
 	until                                time.Time
+	untilBy                              string
 	joined                               sync.WaitGroup
 }
 
@@ -82,7 +83,7 @@ func NewConnectorObservationOperationChannel(ctx context.Context, exchangeID str
 	}
 	until := identity.Earlier(originalEnd, identity.Earlier(owner.NotAfter, identity.Earlier(leaf.NotAfter, keys.runUntil)))
 	root, cancel := context.WithDeadline(ctx, until)
-	return &ConnectorObservationOperationChannel{ctx: root, cancel: cancel, exchangeID: exchangeID, pin: pin, state: owned, owner: owner, leaf: leaf, keys: keys, verifier: verifier, candidates: candidates, registry: registry, producer: producer, metadata: metadata, now: now, until: until}, nil
+	return &ConnectorObservationOperationChannel{ctx: root, cancel: cancel, exchangeID: exchangeID, pin: pin, state: owned, owner: owner, leaf: leaf, keys: keys, verifier: verifier, candidates: candidates, registry: registry, producer: producer, metadata: metadata, now: now, until: until, untilBy: "connection"}, nil
 }
 
 func (c *ConnectorObservationOperationChannel) Close() {
@@ -141,7 +142,7 @@ func (c *ConnectorObservationOperationChannel) enter(ctx context.Context, kind c
 	if kind == contracts.ClusterObservationReadFrame {
 		c.read = true
 	}
-	c.until = identity.Earlier(c.until, end)
+	c.narrow(end, "call")
 	until := c.until
 	c.joined.Add(1)
 	c.mu.Unlock()
@@ -167,6 +168,14 @@ func (c *ConnectorObservationOperationChannel) enter(ctx context.Context, kind c
 		return nil, nil, value.ErrUnavailable
 	}
 	return call, finish, nil
+}
+
+// narrow shortens the channel's interval and records which bound set it, for
+// the window refusal's diagnostic step. The caller holds c.mu.
+func (c *ConnectorObservationOperationChannel) narrow(t time.Time, by string) {
+	if t.Before(c.until) {
+		c.until, c.untilBy = t, by
+	}
 }
 
 func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx context.Context, p contracts.ClusterObservationOperationProbe) (contracts.ConnectorObservationOperationReply, error) {
@@ -195,7 +204,7 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 	}
 	if c.request.ID == "" {
 		c.request = r
-		c.until = identity.Earlier(c.until, r.NotAfter)
+		c.narrow(r.NotAfter, "request")
 	}
 	until := c.until
 	c.mu.Unlock()
@@ -222,7 +231,7 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 		original := owner
 		c.origin = &original
 	}
-	c.until = identity.Earlier(c.until, owner.until)
+	c.narrow(owner.until, "owner")
 	saved := owner
 	c.lastOwner = &saved
 	until = c.until
@@ -248,13 +257,13 @@ func (c *ConnectorObservationOperationChannel) AnswerConnectorObservation(ctx co
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.until = identity.Earlier(c.until, ownerObservationTime(reply.NativeUntil))
+	c.narrow(ownerObservationTime(reply.NativeUntil), "native")
 	currentKeys, stopCurrent := context.WithDeadline(bounded, c.until)
 	defer stopCurrent()
 	if c.closed || c.failed || c.ctx.Err() != nil || !c.now().Before(c.until) || c.producer.credentials.observationKeysCurrent(currentKeys, c.keys) != nil {
 		step := "keys"
 		if !c.now().Before(c.until) {
-			step = "window"
+			step = "window-" + c.untilBy
 		}
 		return zero, answerStep(step, value.ErrUnavailable, nil)
 	}
@@ -319,7 +328,7 @@ func (c *ConnectorObservationOperationChannel) ObserveCluster(ctx context.Contex
 		return zero, value.ErrUnavailable
 	}
 	c.digest = digest
-	c.until = identity.Earlier(c.until, result.Interval.FreshUntil)
+	c.narrow(result.Interval.FreshUntil, "result")
 	success = true
 	return result, nil
 }
@@ -371,7 +380,7 @@ func (c *ConnectorObservationOperationChannel) checkSelectedOwner(ctx context.Co
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.until = identity.Earlier(c.until, checked.until)
+	c.narrow(checked.until, "owner-check")
 	if c.closed || c.failed || c.ctx.Err() != nil || call.Err() != nil || ctx.Err() != nil || !c.now().Before(c.until) {
 		return value.ErrUnavailable
 	}

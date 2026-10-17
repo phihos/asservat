@@ -178,13 +178,13 @@ func (o *OwnerObservationOperation) read(ctx context.Context, ordinal int) (cont
 	var z contracts.OwnerObservationOperationReply
 	call, finish, err := o.enter(ctx, ordinal, false)
 	if err != nil {
-		return z, err
+		return z, answerStep("enter", err, nil)
 	}
 	good := false
 	defer func() { finish(good) }()
 	r, err := o.current(call)
 	if err != nil || !sameOwnerOperationRegistration(o.registration, r) {
-		return z, value.ErrUnavailable
+		return z, answerStep("registration", value.ErrUnavailable, err)
 	}
 	o.mu.Lock()
 	o.until = identity.Earlier(o.until, r.FreshUntil)
@@ -196,24 +196,31 @@ func (o *OwnerObservationOperation) read(ctx context.Context, ordinal int) (cont
 	if ordinal == 4 {
 		facts, err = o.native.Final(registryCall)
 		if err != nil || !facts.Final || !facts.Valid(o.now()) || !sameOwnerOperationFacts(o.initial, facts) || !ownerOperationPeerMatches(facts, r) {
-			return z, value.ErrUnavailable
+			return z, answerStep("final-native", value.ErrUnavailable, err)
 		}
 		nativeCall, stopNative := context.WithDeadline(registryCall, identity.Earlier(registryEnd, facts.FreshUntil))
 		defer stopNative()
 		r, err = o.current(nativeCall)
 		if err != nil || !sameOwnerOperationRegistration(o.registration, r) {
-			return z, value.ErrUnavailable
+			return z, answerStep("final-registration", value.ErrUnavailable, err)
 		}
 	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.closed || o.root.Err() != nil || call.Err() != nil || ctx.Err() != nil || !facts.Valid(o.now()) || !r.Valid(o.now()) {
-		return z, value.ErrUnavailable
+		step := "state"
+		switch {
+		case !facts.Valid(o.now()):
+			step = "facts-expired"
+		case !r.Valid(o.now()):
+			step = "registration-expired"
+		}
+		return z, answerStep(step, value.ErrUnavailable, nil)
 	}
 	o.until = identity.Earlier(o.until, identity.Earlier(facts.FreshUntil, r.FreshUntil))
 	facts.FreshUntil = identity.Earlier(facts.FreshUntil, o.until)
 	if !facts.Valid(o.now()) {
-		return z, value.ErrUnavailable
+		return z, answerStep("window", value.ErrUnavailable, nil)
 	}
 	if ordinal == 4 {
 		o.final = true

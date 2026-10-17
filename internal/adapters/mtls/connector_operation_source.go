@@ -99,10 +99,14 @@ func (s *RemoteConnectorObservationOperationSource) ReadConnectorObservationValu
 		end, finite = ctx.Deadline()
 	}
 	if ctx == nil || !finite || ctx.Err() != nil || s.closed || s.busy || s.root.Err() != nil || ordinal != s.ordinal+1 || ordinal > 4 || ordinal == 3 && s.registered != 2 || !s.now().Before(s.until) {
+		step := "source-state"
+		if !s.now().Before(s.until) {
+			step = "source-window"
+		}
 		s.closed = true
 		s.cancel()
 		s.mu.Unlock()
-		return zero, value.ErrUnavailable
+		return zero, answerStep(step, value.ErrUnavailable, nil)
 	}
 	s.ordinal = ordinal
 	s.busy = true
@@ -126,25 +130,29 @@ func (s *RemoteConnectorObservationOperationSource) ReadConnectorObservationValu
 	defer func() { cancel(); joinCall() }()
 	before, err := s.verifier.verify(s.state.PeerCertificates, "client", s.verifier.clientRoots)
 	if err != nil || before != s.leaf {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("peer", value.ErrUnavailable, err)
 	}
 	wire, err := s.exchange.ReadConnectorObservationOperation(call, ordinal)
 	if err != nil {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("exchange", value.ErrUnavailable, err)
 	}
 	out, err := parseConnectorOperationReply(wire, s.pin, s.leaf, s.request, ordinal, s.channel, s.now())
 	if err != nil {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("parse", value.ErrUnavailable, err)
 	}
 	after, err := s.verifier.verify(s.state.PeerCertificates, "client", s.verifier.clientRoots)
 	if err != nil || after != before || call.Err() != nil || ctx.Err() != nil {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("peer-after", value.ErrUnavailable, err)
 	}
 	out = restrictConnectorOperationValue(out, until)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed || s.root.Err() != nil || call.Err() != nil || ctx.Err() != nil || !out.Matches(s.pin, s.request, ordinal, s.now()) || s.last != nil && !out.Continues(*s.last) {
-		return zero, value.ErrUnavailable
+		step := "value-match"
+		if !s.now().Before(out.Until()) {
+			step = "value-expired"
+		}
+		return zero, answerStep(step, value.ErrUnavailable, nil)
 	}
 	s.until = identity.Earlier(s.until, out.Until())
 	last := out.Clone()

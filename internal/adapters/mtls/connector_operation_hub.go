@@ -234,23 +234,26 @@ func (p *hubConnectorOperationProofs) ReadConnectorObservationOperation(ctx cont
 	}
 	peer, err := p.hub.owner.peers.peer(&p.hub.state)
 	if err != nil || peer != p.hub.peer {
-		return zero, value.ErrUnavailable
+		return zero, answerStep("peer", value.ErrUnavailable, err)
 	}
 	owner, err := p.operation.read(ctx, ordinal)
 	if err != nil {
-		return zero, err
+		return zero, answerStep("owner-read", err, nil)
 	}
 	until := ownerObservationTime(owner.NativeUntil)
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	out, err := p.hub.stream.ExchangeConnectorObservationOperation(call, contracts.ClusterObservationOperationProbe{Format: contracts.ClusterObservationOperationExchangeFormat, ExchangeID: p.hub.exchangeID, Ordinal: ordinal, Owner: owner})
 	current, peerErr := p.hub.owner.peers.peer(&p.hub.state)
-	if err != nil || peerErr != nil || current != peer || call.Err() != nil || !p.hub.now().Before(until) {
-		return zero, value.ErrUnavailable
+	if err != nil {
+		return zero, answerStep("region", value.ErrUnavailable, err)
+	}
+	if peerErr != nil || current != peer || call.Err() != nil || !p.hub.now().Before(until) {
+		return zero, answerStep("region-window", value.ErrUnavailable, nil)
 	}
 	end, err := p.operation.checkRetained(call, false)
 	if err != nil {
-		return zero, err
+		return zero, answerStep("retained", err, nil)
 	}
 	out.NativeUntil = identity.Earlier(ownerObservationTime(out.NativeUntil), end).UTC().Format(time.RFC3339Nano)
 	out.SourceFreshUntil = identity.Earlier(ownerObservationTime(out.SourceFreshUntil), end).UTC().Format(time.RFC3339Nano)
