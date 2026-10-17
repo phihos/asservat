@@ -19,10 +19,22 @@ func (d *CapacityHubWorkerDeployment) runProviderCapacity(ctx context.Context) e
 		return mounts.ErrUnavailable
 	}
 	var mountUntil time.Time
+	// One closed waiting state per change, so a capacity child that never
+	// starts is visible (ADR-197 CI continuation run 13).
+	waiting := ""
+	wait := func(state string) {
+		if state != waiting {
+			waiting = state
+			fmt.Fprintln(os.Stderr, "capacity waiting: "+state)
+		}
+	}
 	for ctx.Err() == nil {
 		ready, err := d.activation.CapacityProjectionHint(ctx)
 		if err != nil {
 			return &fixedStepError{"hint", err}
+		}
+		if !ready {
+			wait("projection hint pending")
 		}
 		if ready {
 			if mountUntil.IsZero() {
@@ -32,10 +44,15 @@ func (d *CapacityHubWorkerDeployment) runProviderCapacity(ctx context.Context) e
 				return &fixedStepError{"mount-wait", mounts.ErrUnavailable}
 			}
 			child, files, err := d.openProviderCapacity(ctx)
+			if errors.Is(err, errCapacityProjectionMountPending) {
+				wait("projection mount pending")
+			}
 			if !errors.Is(err, errCapacityProjectionMountPending) {
 				if err != nil {
 					return &fixedStepError{"open", err}
 				}
+				waiting = ""
+				fmt.Fprintf(os.Stderr, "capacity started with %d regional clusters\n", len(child.regional))
 				err = d.runProviderCapacityChild(ctx, child, files)
 				// ADR-197 decision 6: a changed effective cluster set replaces
 				// only this child; the process, its Lease and the configuration
