@@ -2,6 +2,7 @@ package capacity
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -204,7 +205,7 @@ func (s *CapacityWorkReconciler) ReconcileWorkload(ctx context.Context, source A
 	}
 	enrolled, err := s.Enrollment.Reconcile(l.ctx, observation)
 	if err != nil {
-		return capacityStage("enroll", cfg.ErrUnavailable)
+		return capacityStage("enroll", errors.Join(cfg.ErrUnavailable, err))
 	}
 	if !l.narrow(observation.FreshUntil) {
 		return capacityStage("enroll-fresh", cfg.ErrUnavailable)

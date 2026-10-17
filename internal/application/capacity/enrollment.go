@@ -121,28 +121,28 @@ type EnrollmentCoordinator struct {
 func (s *EnrollmentCoordinator) Reconcile(ctx context.Context, o EnrollmentObservation) (Enrollment, error) {
 	var zero Enrollment
 	if s == nil || s.Store == nil || s.Capture == nil || s.Accounts == nil || s.Now == nil || ctx == nil || ctx.Err() != nil || !o.Valid(s.Now()) || o.Plan.AccountVersion() != s.Accounts.AccountVersion() {
-		return zero, cfg.ErrUnavailable
+		return zero, capacityStage("observation", cfg.ErrUnavailable)
 	}
 	live, cancel := context.WithDeadline(ctx, o.FreshUntil)
 	defer cancel()
 	current := func() bool { return live.Err() == nil && o.Valid(s.Now()) }
 	v, err := s.Store.ReadCapacityEnrollment(live, o)
 	if err != nil || !current() {
-		return zero, cfg.ErrUnavailable
+		return zero, capacityStage("read", errors.Join(cfg.ErrUnavailable, err))
 	}
 	if v == nil {
 		x, e := s.Store.ReserveCapacityEnrollment(live, o)
 		if e != nil || !current() {
-			return zero, cfg.ErrUnavailable
+			return zero, capacityStage("reserve", errors.Join(cfg.ErrUnavailable, e))
 		}
 		v = &x
 	}
 	if !v.matches(o) || v.AccountVersion != s.Accounts.AccountVersion() {
-		return zero, cfg.ErrChanged
+		return zero, capacityStage("mismatch", cfg.ErrChanged)
 	}
 	digest, err := s.Accounts.CaptureAccount(o.Key.RootID, v.AllocationID)
 	if err != nil || digest != v.AccountDigest || !current() {
-		return zero, cfg.ErrUnavailable
+		return zero, capacityStage("account", errors.Join(cfg.ErrUnavailable, err))
 	}
 	if v.ReadyAt != nil {
 		return *v, nil
@@ -165,10 +165,10 @@ func (s *EnrollmentCoordinator) Reconcile(ctx context.Context, o EnrollmentObser
 			next, err = s.Capture.ContinueCapacityCapture(live, o, *v)
 		}
 		if e := advance(next, err); e != nil {
-			return zero, e
+			return zero, capacityStage("capture", errors.Join(e, err))
 		}
 		if v.CaptureBackedAt == nil || v.ReadyAt != nil {
-			return zero, cfg.ErrChanged
+			return zero, capacityStage("capture-phase", cfg.ErrChanged)
 		}
 	}
 	var next Enrollment
@@ -178,7 +178,7 @@ func (s *EnrollmentCoordinator) Reconcile(ctx context.Context, o EnrollmentObser
 		next, err = s.Store.ContinueCapacityPublication(live, o, *v)
 	}
 	if e := advance(next, err); e != nil {
-		return zero, e
+		return zero, capacityStage("publish", errors.Join(e, err))
 	}
 	if v.ReadyAt == nil {
 		return zero, ErrEnrollmentPending

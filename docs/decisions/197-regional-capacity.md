@@ -419,3 +419,10 @@ regional slot.
     native reader's client and shared its 20 QPS limiter, so the guarded
     metadata spent the final bracket's budget. The metadata now has its
     own observer instance at the same fixed limit.
+  - [CI run 11](../../test/results/adr197-continuation-ci-11/native-continuation-1/context-storage-environment.json)
+    (run 39044413471): with separate limiters the first guarded-workload
+    observation succeeded (2.12 s), and enrollment then refused at its
+    `enroll` stage about 20 ms later without a reservation row. The
+    enrollment coordinator's steps (observation, read, reserve, mismatch,
+    account, capture, publish) are now labelled and the cause is passed
+    through.
