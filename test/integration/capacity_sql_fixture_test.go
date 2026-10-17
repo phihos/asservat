@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -143,7 +144,19 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		t.Fatal("fixture fleet observation during role production", failure)
 	}
 	if err != nil {
-		t.Fatal("actual fixed role production", err)
+		// The stop names its step only; say which closed cause ended it.
+		cause := "other"
+		switch {
+		case errors.Is(err, context.DeadlineExceeded), errors.Is(err, context.Canceled):
+			cause = "deadline"
+		case errors.Is(err, cfg.ErrChanged):
+			cause = "changed"
+		case errors.Is(err, cfg.ErrInvalid):
+			cause = "invalid"
+		case errors.Is(err, cfg.ErrUnavailable):
+			cause = "unavailable"
+		}
+		t.Fatal("actual fixed role production", err, cause, time.Since(start).Round(time.Millisecond))
 	}
 	t.Logf("fixed_role_production_ms=%d", time.Since(start).Milliseconds())
 	// Original protected material comes only from the fixture root whose claims

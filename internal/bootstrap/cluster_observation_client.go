@@ -127,8 +127,11 @@ func (c *InstalledClusterObservationClient) selected(ctx context.Context, connec
 
 func (c *InstalledClusterObservationClient) ObserveCluster(ctx context.Context, request value.ClusterObservationRequest) (value.ClusterObservationResult, error) {
 	var zero value.ClusterObservationResult
+	// Fixed steps name the refusing phase in the hub-worker's capacity log
+	// (ADR-197 runs 20-21: local discovery failed with no cause).
+	step := func(name string, err error) error { return &fixedStepError{name, err} }
 	if c == nil || ctx == nil || ctx.Err() != nil || !request.Valid(c.now()) || request.RootID != c.pin.RootID || !c.enter() {
-		return zero, value.ErrUnavailable
+		return zero, step("enter", value.ErrUnavailable)
 	}
 	defer c.leave()
 	request = request.Clone()
@@ -148,7 +151,7 @@ func (c *InstalledClusterObservationClient) ObserveCluster(ctx context.Context, 
 	}()
 	candidates, e := c.candidates.ReadOwnerObservationCandidates(call)
 	if e != nil || !candidates.Valid(c.now()) || candidates.Pool != c.pin.Pool || len(candidates.Owners) == 0 {
-		return zero, value.ErrUnavailable
+		return zero, step("candidates", value.ErrUnavailable)
 	}
 	candidates.Owners = append([]value.OwnerBinding(nil), candidates.Owners...)
 	until = identity.Earlier(until, candidates.ValidUntil)
@@ -156,7 +159,7 @@ func (c *InstalledClusterObservationClient) ObserveCluster(ctx context.Context, 
 	defer end()
 	raw, e := (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: -1}).DialContext(bounded, "tcp", c.address)
 	if e != nil || raw == nil {
-		return zero, value.ErrUnavailable
+		return zero, step("dial", value.ErrUnavailable)
 	}
 	defer raw.Close()
 	if raw.SetDeadline(until) != nil {
@@ -171,16 +174,16 @@ func (c *InstalledClusterObservationClient) ObserveCluster(ctx context.Context, 
 	}()
 	socket := tls.Client(raw, &tls.Config{RootCAs: c.roots.Clone(), ServerName: c.name, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, NextProtos: []string{"h2"}, SessionTicketsDisabled: true, Time: c.now})
 	if socket.HandshakeContext(bounded) != nil {
-		return zero, value.ErrDenied
+		return zero, step("tls", value.ErrDenied)
 	}
 	state := socket.ConnectionState()
 	connection, e := mtls.NewOwnerBootstrapConnection(c.verifier, &state, candidates)
 	if e != nil {
-		return zero, value.ErrDenied
+		return zero, step("verify", value.ErrDenied)
 	}
 	before, workload, e := c.selected(bounded, connection)
 	if e != nil {
-		return zero, e
+		return zero, step("selected", e)
 	}
 	until = identity.Earlier(until, identity.Earlier(before.ValidUntil, workload.FreshUntil))
 	current, stopCurrent := context.WithDeadline(bounded, until)
@@ -192,7 +195,7 @@ func (c *InstalledClusterObservationClient) ObserveCluster(ctx context.Context, 
 	token, e := c.tokens.ReadClusterObservationToken(current)
 	defer clear(token)
 	if e != nil || len(token) < 1 || len(token) > 16<<10 || bytes.ContainsAny(token, " \t\r\n") || current.Err() != nil || !before.Valid(c.now()) || !workload.Valid(c.now()) || !c.now().Before(until) {
-		return zero, value.ErrUnavailable
+		return zero, step("token", value.ErrUnavailable)
 	}
 	digest, e := wire.RequestDigest(request)
 	if e != nil {
@@ -221,10 +224,14 @@ func (c *InstalledClusterObservationClient) ObserveCluster(ctx context.Context, 
 	r.Header.Set("Accept", contracts.ClusterObservationLocalMedia)
 	response, e := client.Do(r)
 	if e != nil {
-		return zero, value.ErrUnavailable
+		return zero, step("post", value.ErrUnavailable)
 	}
 	defer response.Body.Close()
-	if response.ProtoMajor != 2 || response.StatusCode != http.StatusOK || response.TLS == nil || response.TLS.ServerName != c.name || response.ContentLength < 1 || response.ContentLength > contracts.ClusterObservationBytes || len(response.TransferEncoding) != 0 || len(response.Header.Values("Content-Encoding")) != 0 || len(response.Header.Values("Set-Cookie")) != 0 || len(response.Header.Values("Content-Type")) != 1 || response.Header.Get("Content-Type") != contracts.ClusterObservationLocalMedia || len(response.Header.Values("Cache-Control")) != 1 || response.Header.Get("Cache-Control") != "no-store" {
+	if response.StatusCode != http.StatusOK {
+		// The owner answers every refusal with the same status.
+		return zero, step("refused", value.ErrUnavailable)
+	}
+	if response.ProtoMajor != 2 || response.TLS == nil || response.TLS.ServerName != c.name || response.ContentLength < 1 || response.ContentLength > contracts.ClusterObservationBytes || len(response.TransferEncoding) != 0 || len(response.Header.Values("Content-Encoding")) != 0 || len(response.Header.Values("Set-Cookie")) != 0 || len(response.Header.Values("Content-Type")) != 1 || response.Header.Get("Content-Type") != contracts.ClusterObservationLocalMedia || len(response.Header.Values("Cache-Control")) != 1 || response.Header.Get("Cache-Control") != "no-store" {
 		return zero, value.ErrUnavailable
 	}
 	data, e := io.ReadAll(io.LimitReader(response.Body, contracts.ClusterObservationBytes+1))
@@ -233,7 +240,7 @@ func (c *InstalledClusterObservationClient) ObserveCluster(ctx context.Context, 
 	}
 	w, e := contracts.DecodeClusterObservationResult(data)
 	if e != nil {
-		return zero, value.ErrUnavailable
+		return zero, step("decode", value.ErrUnavailable)
 	}
 	result, e := wire.ParseResult(w, request, digest, c.now())
 	if e != nil {
