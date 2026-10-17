@@ -16,6 +16,35 @@ env:
     !/test/results/
 
 jobs:
+  # Documentation, recorded results and the design prototype cannot change
+  # Go or console results; such pushes run only the checks job. The console
+  # generates contracts from docs/interfaces, so that folder always counts.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          PR: ${{ github.event.number }}
+        run: |
+          files=""
+          case $EVENT in
+            push) [[ $BEFORE =~ ^0*$ ]] || files=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$GITHUB_SHA" --jq '.files[].filename') ;;
+            pull_request) files=$(gh pr diff "$PR" --repo "$GITHUB_REPOSITORY" --name-only) ;;
+          esac
+          code=true
+          # The compare API lists at most 300 files; a full list is never trusted as docs-only.
+          if [[ -n $files ]] && (( $(wc -l <<< "$files") < 300 )) &&
+             ! grep -qvE '^(docs/|test/results/|design/|[^/]+\.md$)' <<< "$files" && ! grep -q '^docs/interfaces/' <<< "$files"; then
+            code=false
+          fi
+          echo "code=$code" | tee -a "$GITHUB_OUTPUT"
+
   checks:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -36,6 +65,8 @@ jobs:
       - run: python3 scripts/test-go-shards.py
 
   go:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -64,22 +95,27 @@ jobs:
           key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}-${{ github.sha }}
 
   # scripts/check-go-tests.py --shard: shard 0 runs every package except the
-  # Kubernetes adapter; shards 1-7 run duration-balanced parts of its tests.
+  # Kubernetes adapter; shards 1-9 run duration-balanced parts of its tests
+  # (weights measured on CI). Nine parts reach the floor set by its longest test.
   test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
-    name: test (${{ matrix.shard }}/8)
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    name: test (${{ matrix.shard }}/10)
     steps:
       - uses: actions/checkout@v7
         with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
       - uses: ./.github/actions/setup
-      - run: python3 scripts/check-go-tests.py --shard ${{ matrix.shard }}/8
+      - run: python3 scripts/check-go-tests.py --shard ${{ matrix.shard }}/10
 
   console:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:

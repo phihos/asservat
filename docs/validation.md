@@ -59,10 +59,12 @@ skips are reported; omitted or duplicate execution fails. This avoids an aggrega
 timeout as the package grows, without extending any runtime authority deadline.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the same gate on every push as
-eight jobs: `check-go-tests.py --shard 0/8` runs every non-Kubernetes package,
-shards 1–7 a deterministic, duration-balanced partition of the discovered
-Kubernetes inventory (`scripts/go-test-durations.json`; unknown tests weigh five
-seconds). Each shard keeps the flags, groups and exact event checks above; the
+ten jobs: `check-go-tests.py --shard 0/10` runs every non-Kubernetes package,
+shards 1–9 a deterministic, duration-balanced partition of the discovered
+Kubernetes inventory (`scripts/go-test-durations.json`, measured on CI; unknown
+tests weigh five seconds). Pushes that change only documentation outside
+`docs/interfaces/`, recorded results, the design prototype or root Markdown run
+only the documentation and schema gates. Each shard keeps the flags, groups and exact event checks above; the
 partition is unit-tested to cover the inventory exactly once. The documentation,
 schema, SQL, Helm and console gates run as parallel jobs. Native suites run only
 on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`), each on a
