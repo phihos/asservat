@@ -64,7 +64,7 @@ func (r *capacitySQLRoot) ClaimCapacityRootSetup(ctx context.Context, root, setu
 	if !n.Before(until) {
 		return contracts.PublicRuntimeRoleSnapshot{}, false, cfg.ErrUnavailable
 	}
-	r.value.State.CapacitySetup = &contracts.CapacityRootSetupClaim{OperationID: custodyID(), PermissionRootID: permission, InputDigest: digest, DatabaseOID: db, PostmasterAt: postmaster, ClaimedAt: n, Until: until}
+	r.value.State.CapacitySetup = asStored(&contracts.CapacityRootSetupClaim{OperationID: custodyID(), PermissionRootID: permission, InputDigest: digest, DatabaseOID: db, PostmasterAt: postmaster, ClaimedAt: n, Until: until})
 	r.setupClaims++
 	if r.lostSetupClaim {
 		r.lostSetupClaim = false
