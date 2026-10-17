@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"slices"
 	"time"
@@ -201,6 +202,14 @@ type observationStep struct {
 	err  error
 }
 
-func (e *observationStep) Error() string     { return e.step }
-func (e *observationStep) Unwrap() error     { return e.err }
-func (e *observationStep) FixedStep() string { return e.step }
+func (e *observationStep) Error() string { return e.step }
+func (e *observationStep) Unwrap() error { return e.err }
+
+// FixedStep appends a nested fixed step, so labels compose across layers.
+func (e *observationStep) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
+}

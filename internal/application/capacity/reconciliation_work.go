@@ -44,9 +44,17 @@ type capacityStageError struct {
 	err   error
 }
 
-func (e *capacityStageError) Error() string     { return e.stage }
-func (e *capacityStageError) Unwrap() error     { return e.err }
-func (e *capacityStageError) FixedStep() string { return e.stage }
+func (e *capacityStageError) Error() string { return e.stage }
+func (e *capacityStageError) Unwrap() error { return e.err }
+
+// FixedStep appends a nested fixed step, so labels compose across layers.
+func (e *capacityStageError) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.stage + "/" + inner.FixedStep()
+	}
+	return e.stage
+}
 
 func capacityStage(stage string, err error) error { return &capacityStageError{stage, err} }
 

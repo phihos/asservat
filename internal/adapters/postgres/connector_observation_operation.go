@@ -116,6 +116,14 @@ func registryStep(step string, cause error) error {
 	return &registryStepError{step, errors.Join(value.ErrUnavailable, cause)}
 }
 
-func (e *registryStepError) Error() string     { return e.step }
-func (e *registryStepError) Unwrap() error     { return e.err }
-func (e *registryStepError) FixedStep() string { return e.step }
+func (e *registryStepError) Error() string { return e.step }
+func (e *registryStepError) Unwrap() error { return e.err }
+
+// FixedStep appends a nested fixed step, so labels compose across layers.
+func (e *registryStepError) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
+}
