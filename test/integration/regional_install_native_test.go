@@ -607,41 +607,54 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		t.Fatal("operator regional maintainer binding", err)
 	}
 	t.Log("operator added the regional budget policy, pool slot, workload and maintainer binding")
-	demanded, streak := false, 0
+	diagnose := func() {
+		installedProcessDiagnostics(t, ctx, hub, namespace, prefix+"-worker", prefix+"-owner", kube.FederationWorkloadName(installation))
+		regionalLogs(t, ctx, region)
+		permissionScopeDiagnostics(t, ctx, admin, root)
+	}
+	bindingRow := `FROM capacity_workload w JOIN context_storage_binding b ON b.root_id=w.root_id AND b.allocation_id=w.allocation_id
+ WHERE w.root_id=$1 AND w.cluster_id=$2 AND w.namespace_uid=$3 AND w.workload_uid=$4`
 	for until := time.Now().Add(5 * time.Minute); ; time.Sleep(time.Second) {
-		var ready, fresh bool
-		e := admin.QueryRow(ctx, `SELECT w.ready_at IS NOT NULL,b.fresh_until>clock_timestamp() FROM capacity_workload w JOIN context_storage_binding b ON b.root_id=w.root_id AND b.allocation_id=w.allocation_id
- WHERE w.root_id=$1 AND w.cluster_id=$2 AND w.namespace_uid=$3 AND w.workload_uid=$4`, root, cluster, string(ns.UID), string(app.UID)).Scan(&ready, &fresh)
-		// Three consecutive fresh reads a second apart: only the demand lane
-		// keeps a regional binding fresh that long.
-		if e == nil && ready && fresh && demanded {
-			if streak++; streak == 3 {
-				break
-			}
-		} else {
-			streak = 0
-		}
-		// ADR-200: admission records a refresh demand for a ready workload; the
-		// hub-worker's demand lane then refreshes its binding back to back.
-		// Discovery alone refreshes a regional binding only once per pass.
+		var ready bool
+		e := admin.QueryRow(ctx, `SELECT w.ready_at IS NOT NULL `+bindingRow, root, cluster, string(ns.UID), string(app.UID)).Scan(&ready)
 		if e == nil && ready {
-			if _, err := admin.Exec(ctx, `SELECT demand_capacity_refresh($1,$2,$3,$4,'Deployment',$5,$6)`, root, cluster, string(ns.UID), ns.Name, app.Name, string(app.UID)); err != nil {
-				t.Fatal("regional refresh demand", err)
-			}
-			demanded = true
+			break
 		}
 		if time.Now().After(until) {
-			installedProcessDiagnostics(t, ctx, hub, namespace, prefix+"-worker", prefix+"-owner", kube.FederationWorkloadName(installation))
-			regionalLogs(t, ctx, region)
-			permissionScopeDiagnostics(t, ctx, admin, root)
-			t.Fatal("regional workload did not reach ready_at with a fresh binding", e, ready, fresh)
+			diagnose()
+			t.Fatal("regional workload did not reach ready_at", e, ready)
 		}
+	}
+	// ADR-200: admission records a refresh demand for a ready workload, and the
+	// hub-worker's demand lane refreshes its binding back to back. Discovery
+	// refreshes a regional binding once per pass, which takes minutes. Over 15 s
+	// the lane must refresh at least three times, and at least one sample must
+	// leave the one second of freshness the investigation's wait asks for.
+	if _, err := admin.Exec(ctx, `SELECT demand_capacity_refresh($1,$2,$3,$4,'Deployment',$5,$6)`, root, cluster, string(ns.UID), ns.Name, app.Name, string(app.UID)); err != nil {
+		t.Fatal("regional refresh demand", err)
+	}
+	observed, usable := map[time.Time]bool{}, 0
+	for end := time.Now().Add(15 * time.Second); time.Now().Before(end); time.Sleep(250 * time.Millisecond) {
+		var at time.Time
+		var left float64
+		if err := admin.QueryRow(ctx, `SELECT b.observed_at,EXTRACT(EPOCH FROM b.fresh_until-clock_timestamp())::float8 `+bindingRow, root, cluster, string(ns.UID), string(app.UID)).Scan(&at, &left); err != nil {
+			t.Fatal("regional binding sample", err)
+		}
+		observed[at.UTC()] = true
+		if left >= 1 {
+			usable++
+		}
+	}
+	t.Logf("demand lane: %d distinct binding observations and %d samples with at least 1 s left in 15 s", len(observed), usable)
+	if len(observed) < 4 || usable == 0 {
+		diagnose()
+		t.Fatal("regional binding was not refreshed on demand", len(observed), usable)
 	}
 	var revisions int
 	if err = admin.QueryRow(ctx, `SELECT count(*) FROM capacity_pool_revision WHERE root_id=$1`, root).Scan(&revisions); err != nil || revisions != 1 {
 		t.Fatal("pool revision chain", revisions, err)
 	}
-	t.Log("regional workload enrolled through v2 to ready_at; a refresh demand made its binding fresh; the pool extended once")
+	t.Log("regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool extended once")
 }
 
 // permissionScopeDiagnostics shows why a maintainer scope may be missing from

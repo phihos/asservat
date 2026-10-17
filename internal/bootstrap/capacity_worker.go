@@ -368,14 +368,11 @@ func capacitySourceReporter() func(error) {
 	}
 }
 
-// capacityDemandReporter logs one line per change of the ADR-200 demand
-// lane's outcome. The lane is serial, so the closure needs no lock.
-func capacityDemandReporter() func(error, time.Duration) {
-	last := ""
-	return func(err error, elapsed time.Duration) {
-		if outcome := regionalOutcome(err); outcome != last {
-			last = outcome
-			fmt.Fprintf(os.Stderr, "capacity demand refresh: %s after %s\n", outcome, elapsed.Round(10*time.Millisecond))
-		}
+// capacityDemandReporter logs every ADR-200 demand-lane outcome with the
+// guarded read's freshness left on return: the lane runs only while a demand
+// lasts (sixty seconds), so this is about twenty lines per demand.
+func capacityDemandReporter() func(error, time.Duration, time.Duration) {
+	return func(err error, elapsed, left time.Duration) {
+		fmt.Fprintf(os.Stderr, "capacity demand refresh: %s after %s, read left %s\n", regionalOutcome(err), elapsed.Round(10*time.Millisecond), left.Round(10*time.Millisecond))
 	}
 }
