@@ -84,7 +84,7 @@ func (r *publicRoleSQLRoot) ClaimPublicRuntimeRole(ctx context.Context, purpose 
 		if !n.Before(until) {
 			return contracts.PublicRuntimeRoleSnapshot{}, false, cfg.ErrUnavailable
 		}
-		role.Claim = &contracts.PublicRuntimeRoleClaim{OperationID: custodyID(), ClaimedAt: n, Until: until, DatabaseOID: db, PostmasterAt: postmaster}
+		role.Claim = asStored(&contracts.PublicRuntimeRoleClaim{OperationID: custodyID(), ClaimedAt: n, Until: until, DatabaseOID: db, PostmasterAt: postmaster})
 		r.claims++
 		if r.beforeClaim != nil {
 			r.beforeClaim()
@@ -519,4 +519,21 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		t.Fatal("current recovery fence ignored")
 	}
 	t.Log("actual SQL role creation/SCRAM/privilege matrix passed; Secret root CAS and protected configuration facts were explicit synthetic test inputs")
+}
+
+// asStored returns v as the protected Secret holds it, through the same JSON
+// the snapshots use, so the root compares one time representation on every
+// host. pgx and ctx.Deadline() return local-zone times, and on a UTC runner
+// the JSON round trip turns those into time.UTC, which != and DeepEqual see
+// as a changed claim (the first CI fleet runs).
+func asStored[T any](v *T) *T {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	out := new(T)
+	if err = json.Unmarshal(b, out); err != nil {
+		panic(err)
+	}
+	return out
 }
