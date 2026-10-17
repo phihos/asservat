@@ -48,6 +48,20 @@ func (s *CapacityRefreshDemands) DemandCapacityRefresh(ctx context.Context, r ta
 	return nil
 }
 
+// DemandDownloadRefresh re-arms the demand for the workload behind a download
+// allocation (ADR-200). SQL ignores an allocation without an earlier demand.
+func (s *CapacityRefreshDemands) DemandDownloadRefresh(ctx context.Context, allocation string) error {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(allocation) {
+		return value.ErrUnavailable
+	}
+	call, end := context.WithTimeout(ctx, 2*time.Second)
+	defer end()
+	if err := custodydb.New(s.ledger.pool).DemandDownloadCapacityRefresh(call, custodydb.DemandDownloadCapacityRefreshParams{RootID: id(s.root), AllocationID: id(allocation)}); err != nil {
+		return value.ErrUnavailable
+	}
+	return nil
+}
+
 func (s *CapacityRefreshDemands) ReadCapacityRefreshDemands(ctx context.Context) ([]capacity.CapacityRefreshDemand, error) {
 	if s == nil || ctx == nil || ctx.Err() != nil {
 		return nil, value.ErrUnavailable

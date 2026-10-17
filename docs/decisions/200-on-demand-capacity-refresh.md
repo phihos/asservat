@@ -62,9 +62,13 @@ always be refused.
   the investigation records a demand and rereads every 250 ms until the
   binding is fresh or its original deadline passes. No deadline is extended
   and no check is skipped; a timeout reports the existing retryable outcome.
-- **Downloads** use the same demand once their preparation carries the workload
-  names; until then they still need a binding refreshed by discovery or by a
-  capture demand.
+- **Downloads** re-arm the demand (migration 00067): demand rows keep their
+  names after they expire, and download preparation, which knows only its
+  download allocation, calls `demand_capacity_refresh_for_download`
+  (`download-session` role) when the session reservation is refused as
+  unavailable, then retries the idempotent reservation every 250 ms within its
+  original deadline. A workload without an earlier capture demand has no names
+  to re-arm and still relies on discovery.
 
 ## Consequences
 
@@ -122,4 +126,8 @@ always be refused.
   six refreshes, eight and nine samples with a second left, in 15 s). 25b
   failed earlier: the promoted owner's native port never became reachable
   after a 1 min 44 s owner installation step. Three of the last six runs pass.
+- **Downloads** (migration 00067, schema 67): demand rows outlive their expiry,
+  `demand_capacity_refresh_for_download` re-arms the demand behind a download
+  allocation, and the download coordinator retries a reservation refused as
+  unavailable within its deadline. Unit tests pass; the SQL stage is extended.
 
