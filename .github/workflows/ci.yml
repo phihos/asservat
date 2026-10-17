@@ -111,7 +111,11 @@ jobs:
       - uses: actions/checkout@v7
         with: { filter: "blob:none", sparse-checkout: "${{ env.CHECKOUT_SPARSE }}", sparse-checkout-cone-mode: false }
       - uses: ./.github/actions/setup
+      # Shard 0 runs ~56 packages under -race: two at a time, as the local
+      # gate (GOFLAGS=-p=2), not four, which starved timing-bound tests.
       - run: python3 scripts/check-go-tests.py --shard ${{ matrix.shard }}/10
+        env:
+          GOFLAGS: ${{ matrix.shard == 0 && '-p=2' || '' }}
 
   console:
     needs: changes
