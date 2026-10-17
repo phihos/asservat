@@ -33,11 +33,6 @@ func (s *capacityDiscoveryCursor) resetWorkloads() {
 	s.workloads, s.workloadIndex, s.workloadNext, s.workloadRV, s.workloadPageLoaded = nil, 0, "", "", false
 }
 
-// pending reports whether next yields a candidate without any I/O.
-func (s *capacityDiscoveryCursor) pending() bool {
-	return s.namespaceIndex < len(s.namespaces) && s.workloadIndex < len(s.workloads)
-}
-
 func (s *capacityDiscoveryCursor) next(ctx context.Context, reader CapacityWorkloadReader) (cfg.NamespaceRef, cfg.WorkloadRef, bool, error) {
 	var ns cfg.NamespaceRef
 	var candidate cfg.WorkloadRef

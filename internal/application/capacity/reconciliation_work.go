@@ -33,13 +33,6 @@ type CapacityClusterReaders struct {
 	// about a hundred hub-side API calls, so its cluster never retries
 	// back-to-back (ADR-197); zero keeps the local cluster's cadence.
 	Pace time.Duration
-	// MinSourceWindow, when set, starts a candidate's reconciliation only
-	// while the current accepted source has at least this much freshness
-	// left. Every attempt stays bounded by that source's original interval,
-	// and a regional (v2) guarded read takes two to three seconds of it, so
-	// starting with less only wastes the read (ADR-197). Waiting renews
-	// nothing; the candidate stays queued for the next tick.
-	MinSourceWindow time.Duration
 	// Report, when set, receives each workload reconciliation's outcome and
 	// elapsed time. A refusal names its fixed stage (FixedStep).
 	Report func(error, time.Duration)
@@ -165,7 +158,43 @@ func (s *CapacityWorkReconciler) ReconcileRoot(ctx context.Context, source Accep
 	return nil
 }
 
+// CapacityGuardedFacts are one regional guarded read's guard and workload,
+// each with its own original interval (ADR-197).
+type CapacityGuardedFacts struct {
+	Guard    CapacityNamespaceProtection
+	Workload CapacityWorkloadObservation
+}
+
+// ReadGuardedCandidate performs a regional cluster's combined guard and
+// workload read under the qualification's pinned keys, bounded only by ctx.
+// It confers nothing: ReconcileGuardedWorkload checks the facts like a read
+// made inside the source interval, after current recovery and permissions.
+func (s *CapacityWorkReconciler) ReadGuardedCandidate(ctx context.Context, cluster CapacityClusterReaders, namespace cfg.NamespaceRef, candidate cfg.WorkloadRef) (CapacityGuardedFacts, error) {
+	var zero CapacityGuardedFacts
+	if s == nil || ctx == nil || ctx.Err() != nil || cluster.Guarded == nil {
+		return zero, capacityStage("inputs", cfg.ErrUnavailable)
+	}
+	pin := s.namespacePin(cluster.ClusterID)
+	if pin == nil {
+		return zero, capacityStage("pin", cfg.ErrUnavailable)
+	}
+	guard, workload, err := cluster.Guarded.ReadCapacityGuardedWorkload(ctx, namespace, candidate, pin.Keys)
+	if err != nil {
+		return zero, capacityStage("guarded-read", errors.Join(cfg.ErrUnavailable, err))
+	}
+	return CapacityGuardedFacts{Guard: guard, Workload: workload}, nil
+}
+
+// ReconcileGuardedWorkload reconciles with facts from ReadGuardedCandidate.
+func (s *CapacityWorkReconciler) ReconcileGuardedWorkload(ctx context.Context, source AcceptedCapacitySource, cluster CapacityClusterReaders, namespace cfg.NamespaceRef, candidate cfg.WorkloadRef, facts CapacityGuardedFacts) error {
+	return s.reconcile(ctx, source, cluster, namespace, candidate, &facts)
+}
+
 func (s *CapacityWorkReconciler) ReconcileWorkload(ctx context.Context, source AcceptedCapacitySource, cluster CapacityClusterReaders, namespace cfg.NamespaceRef, candidate cfg.WorkloadRef) error {
+	return s.reconcile(ctx, source, cluster, namespace, candidate, nil)
+}
+
+func (s *CapacityWorkReconciler) reconcile(ctx context.Context, source AcceptedCapacitySource, cluster CapacityClusterReaders, namespace cfg.NamespaceRef, candidate cfg.WorkloadRef, read *CapacityGuardedFacts) error {
 	if !s.sourceValid(source) || s.Permissions == nil || s.Enrollment == nil || s.Enrollment.Accounts == nil || s.Bindings == nil || cluster.Workloads == nil || cluster.Guard == nil {
 		return capacityStage("inputs", cfg.ErrUnavailable)
 	}
@@ -188,7 +217,9 @@ func (s *CapacityWorkReconciler) ReconcileWorkload(ctx context.Context, source A
 	}
 	var guard CapacityNamespaceProtection
 	var workload CapacityWorkloadObservation
-	if cluster.Guarded != nil {
+	if read != nil {
+		guard, workload = read.Guard, read.Workload
+	} else if cluster.Guarded != nil {
 		guard, workload, err = cluster.Guarded.ReadCapacityGuardedWorkload(l.ctx, namespace, candidate, pin.Keys)
 		if err != nil {
 			return capacityStage("guarded-read", cfg.ErrUnavailable)
@@ -202,7 +233,7 @@ func (s *CapacityWorkReconciler) ReconcileWorkload(ctx context.Context, source A
 	if !l.narrow(guard.FreshUntil) {
 		return capacityStage("guard-fresh", cfg.ErrUnavailable)
 	}
-	if cluster.Guarded == nil {
+	if read == nil && cluster.Guarded == nil {
 		workload, err = cluster.Workloads.ReadCapacityWorkload(l.ctx, namespace, candidate, guard.Keys)
 	}
 	if err != nil || !workload.Valid(s.Now()) || workload.Namespace.ClusterID != cluster.ClusterID || workload.Namespace.Namespace != namespace || workload.Workload != candidate {

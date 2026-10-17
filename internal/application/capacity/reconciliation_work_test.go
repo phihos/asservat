@@ -181,3 +181,30 @@ func TestCapacityWorkReconcilerUsesOneGuardedObservation(t *testing.T) {
 		t.Fatal("guarded observation of another guard accepted")
 	}
 }
+
+// ADR-197: a regional guarded read happens first, on its own window; the
+// facts then pass the same pin and freshness checks inside the source
+// interval taken afterwards, with no second read.
+func TestCapacityWorkReconcilerChecksPreReadGuardedFacts(t *testing.T) {
+	s, f, source, cluster, _ := capacityWorkFixture()
+	guarded := &capacityGuardedFacts{capacityWorkFacts: f}
+	cluster.Guarded = guarded
+	facts, err := s.ReadGuardedCandidate(context.Background(), cluster, f.workload.Namespace.Namespace, f.workload.Workload)
+	if err != nil || guarded.calls != 1 {
+		t.Fatal("guarded read", err, guarded.calls)
+	}
+	if err = s.ReconcileGuardedWorkload(context.Background(), source, cluster, f.workload.Namespace.Namespace, f.workload.Workload, facts); err != nil || guarded.calls != 1 {
+		t.Fatal("pre-read facts not reconciled alone", err, guarded.calls)
+	}
+	other := facts
+	other.Guard.Digest = artifact.Digest{9}
+	var step interface{ FixedStep() string }
+	if err = s.ReconcileGuardedWorkload(context.Background(), source, cluster, f.workload.Namespace.Namespace, f.workload.Workload, other); !errors.As(err, &step) || step.FixedStep() != "guard-pin" {
+		t.Fatal("pre-read facts of another guard accepted", err)
+	}
+	expired := facts
+	expired.Workload.FreshUntil = f.now
+	if err = s.ReconcileGuardedWorkload(context.Background(), source, cluster, f.workload.Namespace.Namespace, f.workload.Workload, expired); err == nil {
+		t.Fatal("expired pre-read workload accepted")
+	}
+}

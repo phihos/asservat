@@ -456,9 +456,17 @@ regional slot.
     seconds left. A regional exchange needs 2.2–3 s and composition and
     the SQL phases about 0.5 s more. Discovery LISTs run on the loop's
     own budget, and the direct-observation suite has no source bound,
-    which is why both passed. A regional cluster now starts a queued
-    candidate's reconciliation only while the current source has at least
-    3.5 s left, retrying on later ticks without consuming the candidate;
-    no interval is renewed or extended. Also: a failed TokenReview call is
-    no longer reported as `denied`, composition names its steps, and the
-    regional cause words include the capacity errors.
+    which is why both passed. Also: a failed TokenReview call is no longer
+    reported as `denied`, composition names its steps, and the regional
+    cause words include the capacity errors.
+  - [CI runs 16a/16b](../../test/results/adr197-continuation-ci-16a/native-continuation-1/context-storage-environment.json)
+    (39054066644, 39054072422) tried starting a regional read only while
+    the source had 3.5 s left: the gate never opened, because the source
+    observation itself spends part of its five seconds before it is
+    published. The regional path now reads first: the guarded read runs on
+    its own request window, then the current source is taken, then
+    recovery and permissions are read, and the read's facts pass the same
+    pin and freshness checks inside that source interval before
+    composition and enrollment. No interval is renewed or extended, the
+    authority reads become fresher, and every effect still follows every
+    check. The hub cluster's local path is unchanged.

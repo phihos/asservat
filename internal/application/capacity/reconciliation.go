@@ -192,16 +192,6 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 				if s.Work.Now().Before(ended[i].Add(p)) {
 					return
 				}
-			}
-			if w := s.Clusters[i].MinSourceWindow; w > 0 && cursors[i].pending() {
-				if _, v, ok := current.read(s.Work.Now()); !ok || v.FreshUntil.Sub(s.Work.Now()) < w {
-					if report := s.Clusters[i].Report; report != nil {
-						report(capacityStage("source-window", cfg.ErrUnavailable), 0)
-					}
-					return
-				}
-			}
-			if s.Clusters[i].Pace > 0 {
 				defer func() { ended[i] = s.Work.Now() }()
 			}
 			ns, candidate, found, err := cursors[i].next(call, s.Clusters[i].Workloads)
@@ -210,13 +200,35 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 			}
 			// The candidate LIST does not confer freshness. The exact read gets a
 			// separate original source interval; no already-issued permit changes.
+			started := s.Work.Now()
+			report := s.Clusters[i].Report
+			if s.Clusters[i].Guarded != nil {
+				// ADR-197: a regional guarded read runs on its own request
+				// window first and only then takes the current source, so the
+				// two-to-three-second exchange never spends a source snapshot's
+				// remaining freshness. Composition still intersects every
+				// original interval, and every effect follows every check.
+				facts, err := s.Work.ReadGuardedCandidate(call, s.Clusters[i], ns, candidate)
+				if err == nil {
+					err = capacityStage("source", cfg.ErrUnavailable)
+					if original, v, ok := current.read(s.Work.Now()); ok {
+						until, _ := call.Deadline()
+						live, end := context.WithDeadline(original, until)
+						err = s.Work.ReconcileGuardedWorkload(live, v, s.Clusters[i], ns, candidate, facts)
+						end()
+					}
+				}
+				if report != nil {
+					report(err, s.Work.Now().Sub(started))
+				}
+				return
+			}
 			if original, v, ok := current.read(s.Work.Now()); ok {
 				until, _ := call.Deadline()
 				live, end := context.WithDeadline(original, until)
 				defer end()
-				started := s.Work.Now()
 				err := s.Work.ReconcileWorkload(live, v, s.Clusters[i], ns, candidate)
-				if report := s.Clusters[i].Report; report != nil {
+				if report != nil {
 					report(err, s.Work.Now().Sub(started))
 				}
 			}
