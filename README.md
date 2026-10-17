@@ -1,68 +1,107 @@
 # Asservat
 
-**Catch the evidence before the pod restarts.**
-
-When a Kubernetes workload misbehaves, Asservat captures what you need to debug
-it: packet captures, core dumps, CPU and heap profiles, syscall traces, logs and
-files. It works within limits you set, close to the workload and encrypted from the
-first byte. Developers download native files for their own tools; AI agents query
-the same evidence through MCP under the same permissions.
+**Catch the evidence before the pod restarts.** Asservat records packet captures,
+core dumps, profiles and logs from failing Kubernetes pods, for developers and
+their AI agents.
 
 [![CI](https://github.com/phihos/asservat/actions/workflows/ci.yml/badge.svg)](https://github.com/phihos/asservat/actions/workflows/ci.yml)
 
 > [!WARNING]
-> **Early development, not ready for use.** The design is complete and many
-> components pass tests against real Kubernetes, PostgreSQL, OpenBao and S3. The
-> end-to-end investigation workflow is unfinished, and no collection is enabled
-> for users. See [implementation status](docs/implementation-status.md).
+> **Early development: not usable yet.** Sign-in, permission checks, encrypted
+> storage, downloads and a small pod-status capture pass tests against real
+> Kubernetes, PostgreSQL, OpenBao and S3. Collection of everything else in the
+> following table is designed but not built, and there is no release. See
+> [implementation status](docs/implementation-status.md).
 
-![Asservat overview: open cases, recording health and captures in progress](design/ui/previews/workspace.png)
+![Design prototype of the Asservat console with open cases, recording health and captures in progress](design/ui/previews/workspace.png)
 <sub>Design prototype with synthetic data.</sub>
+
+## What you can capture
+
+By the time someone is paged, the container has restarted and the packets are
+gone. Asservat records evidence on the failing pod while it happens. You get each
+piece as an ordinary file for the tool you already use:
+
+| Evidence | What you get | Open it with | Status |
+| --- | --- | --- | --- |
+| Pod state | Phase, readiness, container counts and restarts, as JSON | Console, any JSON tool | Tested |
+| Logs | Container logs from 30 s before to 10 s after the failure | Any text tool | Designed |
+| Packet capture | PCAPNG filtered with tcpdump syntax; peers named by Kubernetes Service and Pod | Wireshark, tcpdump | Designed |
+| HTTP headers | Header fields you allow, from captured HTTP traffic, as JSON; never bodies | Console, `jq` | Designed |
+| Core dump | ELF core, plus the matching executable and libraries when available | GDB, LLDB or another debugger | Designed |
+| Runtime profile | Go CPU, heap and mutex profiles and execution traces from the pod's pprof endpoint | `go tool pprof`, `go tool trace` | Partly built |
+| Syscall trace | System calls with timing and results; argument memory is not read by default | Console, AI agent queries | Designed |
+| Files and commands | Files and `/proc` entries from the pod, and the output of commands you define | Any tool | Designed |
+
+Packet and syscall recorders can run continuously in a rolling buffer, so a
+trigger saves the seconds *before* the failure too. Every download shows its
+SHA-256 checksum and states what the capture missed. *Tested*: passes tests
+against real services. *Partly built*: acquisition works, the end-to-end path
+does not.
 
 ## Why Asservat
 
-By the time someone is paged, the container has restarted, the packets are gone
-and the memory spike has passed. "Can you reproduce it?" is the usual next step.
-Asservat records what happened while it happens.
-
-- **Capture on trigger, not on request.** Point a policy at a Deployment or
-  StatefulSet. Log patterns, resource thresholds, probe failures, crashes and
-  external alerts start bounded evidence recipes on the affected pod.
-- **The evidence you actually need.** Logs, files and `/proc`, packet captures
-  with pcap filters and Kubernetes-aware peers, HTTP headers, pprof-style runtime
-  profiles, core dumps, syscall traces and custom commands. Reusable capture
-  profiles combine them.
-- **Your tools, native files.** PCAPNG for Wireshark, cores with their companion
-  files for your debugger, profiles for pprof. No proprietary viewer in the way.
-- **Made for AI agents.** A typed MCP interface lets your coding agent find cases,
-  summarize crashes and profiles, query packets and request new captures, with
-  your permissions. Asservat embeds no LLM.
-- **Watch live, keep the last 30 seconds.** Packet and syscall recorders run
-  continuously within limits. Watch approved projections and save a window before
-  it rotates away.
-- **Permissions you already have.** Reuse namespace metadata, RBAC and even
-  pod-exec rights. Manage bindings as CRDs, through `kubectl` or GitOps.
-- **Safe in production.** Per-workload quotas and capture-storm protection,
-  approval for intrusive actions, expiring policy grants, encryption on the node,
-  administrator-enforced retention, and workloads stay at Pod Security `restricted`.
-- **One hub, many clusters, no call-home.** Central management for your
-  organization, installed with Helm. No telemetry, no SaaS, no licence keys.
+- **Captures on its own.** A policy triggers on log patterns, failed probes,
+  crashes, resource thresholds or external alerts.
+- **Built for AI coding agents.** Agents find and query evidence over MCP (Model
+  Context Protocol), with your permissions. Asservat contains no AI model.
+- **Uses your Kubernetes permissions.** Access follows namespaces, RBAC and
+  pod-exec rights; manage it with `kubectl` or GitOps.
+- **Safe in production.** Per-workload size and rate limits, approval for
+  intrusive captures, encryption on the node and retention limits set by
+  administrators. Workloads keep Pod Security `restricted`.
+- **Watch live.** Follow a running packet or syscall recording and save the last
+  30 seconds.
+- **Self-hosted.** One installation serves many clusters. No telemetry, SaaS or
+  licence keys.
 
 ## How it works
 
+Evidence is encrypted on the node and stays in the cluster where it was
+captured. The central hub keeps the catalog, approvals and audit log. Each
+cluster's connector dials out to the hub, so the hub needs no credentials for
+your clusters.
+
 ```mermaid
 flowchart LR
-    T["Pod misbehaves<br/>panic · OOM · probe failure · alert"] --> D["Detector fires<br/>near the workload"]
-    D --> C["Bounded capture<br/>pcap · core · profile · syscalls · logs"]
-    C --> E["Encrypted on the node<br/>stored in the region"]
-    E --> H["Hub<br/>catalog · approvals · audit"]
-    H --> U["Console"]
-    H --> N["Native download<br/>Wireshark · debugger · pprof"]
-    H --> M["MCP<br/>for AI agents"]
+    User["You or your AI agent"] -->|"sign in (OIDC)"| Hub
+    subgraph Central["Central cluster"]
+        Hub["Hub<br/>console · MCP · catalog · audit"]
+        DB[("PostgreSQL")]
+        Hub --- DB
+    end
+    subgraph Workload["Each workload cluster"]
+        Conn["Connector"]
+        Node["Collectors on each node"]
+        Store[("Encrypted evidence")]
+        Conn --> Node
+        Node --> Store
+    end
+    Hub ---|"connector dials out (mTLS)"| Conn
 ```
 
-A policy can be this small. The `workload-failure` preset supplies the detectors,
-recipe, limits and retention:
+Read more in [architecture](docs/architecture.md) and the
+[security model](docs/security.md).
+
+## A look at the console
+
+<table>
+  <tr>
+    <td width="50%"><img src="design/ui/previews/capture-review.png" alt="Design prototype: capture review listing impact, possible user data, retention and readers"><br><b>Review before collecting:</b> impact, possible user data, retention and readers.</td>
+    <td width="50%"><img src="design/ui/previews/evidence.png" alt="Design prototype: network evidence with named peers, HTTP fields and coverage gaps"><br><b>Network evidence</b> with named peers and the gaps in the capture.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="design/ui/previews/live-watch.png" alt="Design prototype: live view of HTTP headers from a recording pod"><br><b>Live view</b> of HTTP headers from an ongoing recording.</td>
+    <td width="50%"><img src="design/ui/previews/download-packets.png" alt="Design prototype: packet capture download as a PCAPNG file for Wireshark"><br><b>Download</b> of a packet capture for Wireshark.</td>
+  </tr>
+</table>
+
+<sub>Design prototype with synthetic data. [Try the prototype](docs/ux/README.md) in your browser; it has 63 screens.</sub>
+
+## Example: capture evidence when a pod panics
+
+This policy uses the planned format; you cannot apply it yet. It watches the
+`api` Deployment with the `workload-failure` preset:
 
 ```yaml
 apiVersion: asservat.io/v1alpha1
@@ -83,88 +122,23 @@ spec:
     value: 'panic:'
 ```
 
-Need more control? [Combine detectors and capture profiles](examples/policy-composed.yaml)
-or browse [all examples](examples/README.md).
-
-## Architecture
-
-```mermaid
-flowchart LR
-    User["Developer · AI agent"] -->|OIDC| Hub
-    subgraph HubCluster["Management cluster"]
-        direction TB
-        Hub["Hub API<br/>console · MCP"]
-        Worker["Hub worker"]
-        DB[("PostgreSQL<br/>catalog · state")]
-        Audit[("Object store<br/>encrypted audit")]
-        Hub --- DB
-        Worker --- DB
-        Hub --- Audit
-    end
-    subgraph Region["Each workload cluster"]
-        direction TB
-        Conn["Connector"]
-        Node["Node collectors"]
-        Store[("Evidence store<br/>encrypted")]
-        Keys["Key service"]
-        Conn --> Node
-        Node --> Store
-        Node -->|wrap only| Keys
-    end
-    Hub ---|"mTLS, dialed out by the connector"| Conn
-```
-
-Raw evidence, keys and analysis stay in the workload's region; the hub keeps the
-catalog, approvals and encrypted audit. Connectors dial out, so the hub never holds
-cluster kubeconfigs. Details: [architecture](docs/architecture.md) and
-[security model](docs/security.md).
-
-## A look at the console
-
-<table>
-  <tr>
-    <td width="50%"><img src="design/ui/previews/capture-review.png" alt="Capture review with impact, user-data and retention notes"><br><b>Review before collecting.</b> Impact, possible user data, retention and who can read the result, with one approval for collection and access.</td>
-    <td width="50%"><img src="design/ui/previews/evidence.png" alt="Network evidence with peers, HTTP fields and coverage gaps"><br><b>Evidence with honest coverage.</b> Kubernetes-aware peers, allowlisted HTTP fields and explicit gaps.</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="design/ui/previews/live-watch.png" alt="Live watch of HTTP headers from a recording pod"><br><b>Watch live.</b> Approved projections of an ongoing recording; save the last 30 seconds in one click.</td>
-    <td width="50%"><img src="design/ui/previews/download-packets.png" alt="Native PCAPNG download for Wireshark"><br><b>Download native files.</b> PCAPNG, cores and profiles for your local tools.</td>
-  </tr>
-</table>
-
-<sub>Design prototype with synthetic data. The [full prototype](docs/ux/README.md) has 63 screens.</sub>
-
-## Status
-
-Asservat is built in vertical slices with every claim backed by recorded test
-runs. Implemented and tested against real services: OIDC sign-in (Keycloak
-reference), Kubernetes permission observation, encrypted pod-context capture and
-publication, audited native downloads, multi-cluster connector enrollment and
-the Helm bootstrap. Packet, core, profile and syscall collectors are designed
-but not yet built.
-
-The next milestone is a complete installed investigation across two clusters.
-Track it in [implementation status](docs/implementation-status.md) and
-[implementation progress](docs/implementation-progress.md).
+When an `api` pod restarts, fails its liveness probe or logs `panic:`, Asservat
+saves up to 13 MiB of encrypted evidence: the pod's Kubernetes state and events,
+process status, network sockets, and logs from 30 seconds before to 10 seconds
+after. [More examples](examples/README.md) add packet captures, profiles and
+core dumps.
 
 ## Learn more
 
-- [Product definition](docs/product.md): users, workflows, requirements and boundaries
-- [Behavior specifications](specs/README.md): normative behavior and acceptance scenarios
-- [MCP workflows](docs/interfaces/mcp-workflows.md): what an agent can do, tool by tool
-- [Security model](docs/security.md): threats, grants, sharing, isolation and privacy
-- [Helm installation](docs/installation/helm.md): the official installation method and its current scope
-- [Decision records](docs/decisions/README.md): every accepted design decision
-- [Project guide](docs/project-guide.md): full reading map, component notes and validation commands
+- [Implementation status](docs/implementation-status.md): what works, how it is tested and what is missing
+- [Product definition](docs/product.md): users, workflows and first-release scope
+- [MCP workflows](docs/interfaces/mcp-workflows.md): what an AI agent can do, tool by tool
+- [Helm installation](docs/installation/helm.md): what the chart installs today
+- [Decision records](docs/decisions/README.md): every accepted design decision and why
+- [Project guide](docs/project-guide.md): reading map, specifications and checks for contributors
 
-## Development
+## Contributing and license
 
-Go, React/TypeScript and PostgreSQL. `make spec-check architecture-check` validates
-the specification; `make go-check` runs the Go gate; native suites such as
-`make context-integration` create and remove their own kind clusters and services.
-CI runs on every push; see [validation](docs/validation.md) for all gates.
-
-## License
-
-[Apache License 2.0](LICENSE). Contributions are welcome under the same terms; see
-[contributing](CONTRIBUTING.md).
+Read the [contributing guide](CONTRIBUTING.md) before opening a pull request, and
+ask questions in [GitHub issues](https://github.com/phihos/asservat/issues).
+Asservat is licensed under the [Apache License 2.0](LICENSE).

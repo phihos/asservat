@@ -22,3 +22,11 @@ Read the [project guide](docs/project-guide.md) and the specification for the ar
 you change. Behavior changes update the relevant `specs/` and, for consequential
 decisions, add a record under `docs/decisions/`. Tests use synthetic data only.
 CI runs the gates in [validation](docs/validation.md) on every pull request.
+
+## Run the checks
+
+Asservat is written in Go and React/TypeScript and stores its state in
+PostgreSQL. `make spec-check architecture-check` checks the specification and
+`make go-check` runs the Go checks. Suites such as `make context-integration`
+create and remove their own kind clusters and services. [Validation](docs/validation.md)
+lists every check.
