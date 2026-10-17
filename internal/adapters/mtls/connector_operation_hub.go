@@ -3,6 +3,7 @@ package mtls
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"sync"
 	"time"
 
@@ -91,12 +92,12 @@ func (h *HubConnectorObservationOperation) Close() {
 func (h *HubConnectorObservationOperation) ObserveClusterOperation(ctx context.Context, request value.ClusterObservationRequest, operation *OwnerObservationOperation) (value.ClusterObservationResult, error) {
 	var zero value.ClusterObservationResult
 	if h == nil || operation == nil || operation.pin != h.owner.peers.pin || operation.server != h.owner.peers.server || ctx == nil || ctx.Err() != nil || !request.Valid(h.now()) || request.RootID != h.pin.Profile.RootID || request.ClusterID != h.pin.Profile.Binding.ClusterID {
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"request", value.ErrUnavailable}
 	}
 	h.mu.Lock()
 	if h.closed || h.spent || h.ctx.Err() != nil {
 		h.mu.Unlock()
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"spent", value.ErrUnavailable}
 	}
 	h.spent = true
 	h.joined.Add(1)
@@ -121,28 +122,28 @@ func (h *HubConnectorObservationOperation) ObserveClusterOperation(ctx context.C
 	defer joinOriginal()
 	ownerRequest := value.OwnerObservationRequest{RootID: request.RootID, ID: request.ID, Challenge: request.Challenge, RequestedAt: request.RequestedAt, NotAfter: request.NotAfter}
 	if err := operation.attach(call, &h.state, h.exchangeID, h.leaf, h.peer, ownerRequest); err != nil {
-		return zero, err
+		return zero, &operationStep{"attach", err}
 	}
 	proofs := &hubConnectorOperationProofs{hub: h, operation: operation}
 	source, err := NewRemoteConnectorObservationOperationSource(call, h.pin, h.owner.peers.pin, ownerRequest, &h.state, proofs, h.now)
 	if err != nil {
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"source", value.ErrUnavailable}
 	}
 	defer source.Close()
 	first, err := h.registry.ReadConnectorObservationOperation(call, ownerRequest, source, source.leaf, 1)
 	if err != nil {
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"registration-1", err}
 	}
 	firstEnd, err := source.AcceptRegistration(call, first)
 	if err != nil {
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"accept-1", err}
 	}
 	until = identity.Earlier(until, firstEnd)
 	current, stopCurrent := context.WithDeadline(call, until)
 	defer stopCurrent()
 	ownerEnd, err := operation.checkRetained(current, false)
 	if err != nil {
-		return zero, err
+		return zero, &operationStep{"retained", err}
 	}
 	until = identity.Earlier(until, ownerEnd)
 	currentOwner, stopOwner := context.WithDeadline(current, until)
@@ -150,22 +151,22 @@ func (h *HubConnectorObservationOperation) ObserveClusterOperation(ctx context.C
 	result, err := h.stream.ExchangeClusterObservation(currentOwner, request.Clone())
 	digest, digestErr := app.ClusterObservationRequestDigest(request)
 	if err != nil || digestErr != nil || !result.Matches(request, digest, h.now()) || current.Err() != nil {
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"exchange", errors.Join(value.ErrUnavailable, err)}
 	}
 	ownerEnd, err = operation.checkRetained(currentOwner, false)
 	if err != nil {
-		return zero, err
+		return zero, &operationStep{"retained-after", err}
 	}
 	until = identity.Earlier(until, identity.Earlier(ownerEnd, result.Interval.FreshUntil))
 	final, stopFinal := context.WithDeadline(currentOwner, until)
 	defer stopFinal()
 	last, err := h.registry.ReadConnectorObservationOperation(final, ownerRequest, source, source.leaf, 3)
 	if err != nil || last.Registration.Certificate != first.Registration.Certificate || last.Registration.Process != first.Registration.Process || last.Registration.Revision != first.Registration.Revision || !last.FinalMatches(h.pin, ownerRequest, h.now()) || !last.Last.Continues(first.Last) {
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"registration-3", errors.Join(value.ErrUnavailable, err)}
 	}
 	lastEnd, err := source.AcceptRegistration(final, last)
 	if err != nil {
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"accept-3", err}
 	}
 	until = identity.Earlier(until, lastEnd)
 	completion, stopCompletion := context.WithDeadline(final, until)
@@ -173,28 +174,39 @@ func (h *HubConnectorObservationOperation) ObserveClusterOperation(ctx context.C
 	receipt := contracts.ClusterObservationReceipt{Format: contracts.ClusterObservationOperationExchangeFormat, ExchangeID: h.exchangeID, RequestID: request.ID, Challenge: request.Challenge, RequestDigest: ownerObservationHex(digest)}
 	receiptEnd, err := operation.CheckFinal(completion)
 	if err != nil {
-		return zero, err
+		return zero, &operationStep{"final", err}
 	}
 	until = identity.Earlier(until, receiptEnd)
 	receiptCall, stopReceipt := context.WithDeadline(completion, until)
 	defer stopReceipt()
 	if receiptCall.Err() != nil || h.stream.CompleteClusterObservation(receiptCall, receipt) != nil {
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"receipt", value.ErrUnavailable}
 	}
 	finalEnd, err := operation.CheckFinal(receiptCall)
 	if err != nil {
-		return zero, err
+		return zero, &operationStep{"final-receipt", err}
 	}
 	until = identity.Earlier(until, finalEnd)
 	result = result.Restrict(request.RequestedAt, until)
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.closed || h.ctx.Err() != nil || receiptCall.Err() != nil || !result.Matches(request, digest, h.now()) {
-		return zero, value.ErrUnavailable
+		return zero, &operationStep{"result", value.ErrUnavailable}
 	}
 	success = true
 	return result, nil
 }
+
+// operationStep names the fixed step at which a regional operation was
+// refused, for operator diagnostics (FixedStep); it wraps the original error.
+type operationStep struct {
+	step string
+	err  error
+}
+
+func (e *operationStep) Error() string     { return e.step }
+func (e *operationStep) Unwrap() error     { return e.err }
+func (e *operationStep) FixedStep() string { return e.step }
 
 type hubConnectorOperationProofs struct {
 	hub       *HubConnectorObservationOperation

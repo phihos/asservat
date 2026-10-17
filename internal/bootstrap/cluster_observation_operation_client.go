@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -459,21 +460,21 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 	}
 	socket, err := c.open(call, s.address, name)
 	if err != nil {
-		return zero, err
+		return zero, &fixedStepError{"open", err}
 	}
 	defer socket.Close()
 	state := socket.socket.ConnectionState()
 	connection, err := mtls.NewOwnerServerConnection(c.verifier, &state, s.leaf.Binding)
 	if err != nil {
-		return zero, value.ErrDenied
+		return zero, &fixedStepError{"peer", value.ErrDenied}
 	}
 	leaf, err := connection.OwnerCertificate()
 	if err != nil || leaf != s.leaf {
-		return zero, value.ErrDenied
+		return zero, &fixedStepError{"peer", value.ErrDenied}
 	}
 	before, err := c.current(call, connection, &s.first)
 	if err != nil {
-		return zero, err
+		return zero, &fixedStepError{"before", err}
 	}
 	end := identity.Earlier(s.until, before.FreshUntil)
 	bounded, stopBounded := context.WithDeadline(call, end)
@@ -485,26 +486,26 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 	defer clear(body)
 	data, err := socket.request(bounded, http.MethodPost, contracts.ClusterObservationLocalClaimPath, contracts.ClusterObservationLocalClaimMedia, body, s.token)
 	if err != nil {
-		return zero, err
+		return zero, &fixedStepError{"post", err}
 	}
 	defer clear(data)
 	after, err := c.current(bounded, connection, &s.first)
 	if err != nil {
-		return zero, err
+		return zero, &fixedStepError{"after", err}
 	}
 	end = identity.Earlier(end, after.FreshUntil)
 	nativeCall, stopNative := context.WithDeadline(bounded, end)
 	defer stopNative()
 	final, err := s.native.Final(nativeCall)
 	if err != nil || !final.Valid(c.now()) || !final.Final || !ownerLocalSameFacts(s.initial, final) || !ownerLocalNativePeer(final, after, s.address) {
-		return zero, value.ErrUnavailable
+		return zero, &fixedStepError{"native-final", errors.Join(value.ErrUnavailable, err)}
 	}
 	end = identity.Earlier(end, final.FreshUntil)
 	finalCall, stopFinal := context.WithDeadline(nativeCall, end)
 	defer stopFinal()
 	current, err := c.current(finalCall, connection, &s.first)
 	if err != nil {
-		return zero, err
+		return zero, &fixedStepError{"current", err}
 	}
 	end = identity.Earlier(end, current.FreshUntil)
 	decoded, err := contracts.DecodeClusterObservationResult(data)
@@ -521,7 +522,7 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 	}
 	result = result.Restrict(request.RequestedAt, end)
 	if finalCall.Err() != nil || c.root.Err() != nil || !result.Matches(request, digest, c.now()) {
-		return zero, value.ErrUnavailable
+		return zero, &fixedStepError{"result", value.ErrUnavailable}
 	}
 	return result, nil
 }

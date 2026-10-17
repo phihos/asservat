@@ -353,3 +353,10 @@ regional slot.
     standbys open and the hub holder admits three entries (two live, one
     served entry in joined cleanup), so a ready standby remains while the
     other is replaced. Request deadlines and claim checks are unchanged.
+  - [CI run 3](../../test/results/adr197-continuation-ci-3/native-continuation-1/context-storage-environment.json)
+    (run 39030184231): two standbys did not change the pattern, which
+    corrects the run-2 reading. `locate` finds a ready standby; the
+    exchange behind `claim` fails, and the region reports `serve
+    (unavailable)`, sometimes right after its first native read. The
+    hub-worker's claim sub-steps, the hub-api's claim handler and the hub
+    coordinator's operation steps now each log their fixed refusal stage.

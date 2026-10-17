@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,6 +47,27 @@ type OwnerLocalObservationReceiver struct {
 	closed                                       bool
 	active, maximum                              int
 	joined                                       sync.WaitGroup
+	refusedMu                                    sync.Mutex
+	refusedLast                                  string
+}
+
+// refused logs one closed claim refusal stage, any nested fixed step and the
+// cause per change, for operator diagnostics (ADR-197); never remote text.
+func (h *OwnerLocalObservationReceiver) refused(stage string, err error) {
+	if err == nil {
+		err = value.ErrUnavailable
+	}
+	line := stage + " (" + regionalCause(err) + ")"
+	var step interface{ FixedStep() string }
+	if errors.As(err, &step) {
+		line = stage + "/" + step.FixedStep() + " (" + regionalCause(err) + ")"
+	}
+	h.refusedMu.Lock()
+	defer h.refusedMu.Unlock()
+	if line != h.refusedLast {
+		h.refusedLast = line
+		fmt.Fprintln(os.Stderr, "owner local claim refused: "+line)
+	}
 }
 
 // Private test seams have no deployment representation. Public construction
@@ -295,6 +319,7 @@ func (h *OwnerLocalObservationReceiver) ServeHTTP(w http.ResponseWriter, r *http
 		request, _, re := wire.ParseRequest(v.Request, h.now())
 		input = value.ClusterObservationClaim{Request: request, Locator: ownerOperationLocator(v.Locator)}
 		if err != nil || re != nil || !input.Matches(h.binding, h.now()) {
+			h.refused("decode", errors.Join(err, re))
 			ownerOperationUnavailable(w)
 			return
 		}
@@ -462,12 +487,14 @@ func (h *OwnerLocalObservationReceiver) locate(w http.ResponseWriter, ctx contex
 func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context.Context, control *http.ResponseController, input value.ClusterObservationClaim, podUID string, token []byte, server value.OwnerCertificate) {
 	pending, err := h.pending.claim(ctx, input, podUID, token, server)
 	if err != nil {
+		h.refused("pending", err)
 		ownerOperationUnavailable(w)
 		return
 	}
 	defer pending.Close()
 	r, err := pending.registry.ReadOwnerRegistration(pending.call, server)
 	if err != nil {
+		h.refused("registration", err)
 		ownerOperationUnavailable(w)
 		return
 	}
@@ -475,6 +502,7 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 	defer stopCurrent()
 	end, err := pending.native.Claim(current, token, podUID)
 	if err != nil {
+		h.refused("native-claim", err)
 		ownerOperationUnavailable(w)
 		return
 	}
@@ -482,17 +510,20 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 	defer stop()
 	selected, err := pending.reservation.Select(call, input.Request)
 	if err != nil {
+		h.refused("select", err)
 		ownerOperationUnavailable(w)
 		return
 	}
 	standby, ok := selected.Conversation().(*regionalObservationOperationStandby)
 	if !ok || standby.bind(pending.operation) != nil {
 		selected.Close()
+		h.refused("bind", nil)
 		ownerOperationUnavailable(w)
 		return
 	}
 	result, err := selected.Observe()
 	if err != nil {
+		h.refused("observe", err)
 		ownerOperationUnavailable(w)
 		return
 	}
@@ -501,6 +532,7 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 	defer stopFinal()
 	ownerEnd, err := pending.operation.CheckFinal(final)
 	if err != nil {
+		h.refused("final", err)
 		ownerOperationUnavailable(w)
 		return
 	}
@@ -508,12 +540,14 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 	result = result.Restrict(input.Request.RequestedAt, end)
 	digest, de := wire.RequestDigest(input.Request)
 	if de != nil || !result.Matches(input.Request, digest, h.now()) {
+		h.refused("result", de)
 		ownerOperationUnavailable(w)
 		return
 	}
 	body, err := contracts.EncodeClusterObservationResult(wire.ResultWire(result))
 	defer clear(body)
 	if err != nil || final.Err() != nil || !h.now().Before(end) || control.SetWriteDeadline(end) != nil {
+		h.refused("write", err)
 		ownerOperationUnavailable(w)
 		return
 	}
