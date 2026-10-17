@@ -137,8 +137,9 @@ jobs:
       - run: cd web && npx playwright install --only-shell chromium
       - run: make console-check console-browser-check
 
-  # The one check the branch ruleset requires: every job passed, or was
-  # skipped as docs-only. A skipped matrix job reports no per-shard checks.
+  # The one check the branch ruleset requires (a skipped matrix job reports
+  # no per-shard checks). changes and checks must pass; go, test and console
+  # may be skipped only when changes classified the push as docs-only.
   ci-ok:
     if: always()
     needs: [changes, checks, go, test, console]
@@ -146,7 +147,13 @@ jobs:
     timeout-minutes: 5
     steps:
       - env:
-          RESULTS: ${{ toJSON(needs.*.result) }}
+          CHANGES: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          CHECKS: ${{ needs.checks.result }}
+          GO: ${{ needs.go.result }}
+          TEST: ${{ needs.test.result }}
+          CONSOLE: ${{ needs.console.result }}
         run: |
-          echo "$RESULTS"
-          ! grep -qE '"(failure|cancelled)"' <<< "$RESULTS"
+          echo "changes=$CHANGES code=$CODE checks=$CHECKS go=$GO test=$TEST console=$CONSOLE"
+          [[ $CHANGES == success && $CHECKS == success ]]
+          [[ $CODE == false ]] || [[ $GO == success && $TEST == success && $CONSOLE == success ]]

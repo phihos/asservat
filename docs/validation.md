@@ -74,8 +74,9 @@ source hashes.
 
 `main` accepts changes only through squash-merged pull requests (repository
 ruleset `protect-main`: no direct push, force push or deletion; review threads
-must be resolved). The ruleset requires the `ci-ok` job, which passes only when
-every CI job passed or was skipped as documentation-only. Native suites can be
+must be resolved). The ruleset requires the `ci-ok` job: `changes` and `checks` must
+pass, and the Go, test and console jobs must pass unless `changes` classified the
+change as documentation-only. Native suites can be
 dispatched on a pull request branch with `gh workflow run native.yml --ref <branch>`.
 
 For local debugging, `scripts/test-context-storage.py --keep-on-failure` leaves
