@@ -136,3 +136,17 @@ jobs:
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - run: cd web && npx playwright install --only-shell chromium
       - run: make console-check console-browser-check
+
+  # The one check the branch ruleset requires: every job passed, or was
+  # skipped as docs-only. A skipped matrix job reports no per-shard checks.
+  ci-ok:
+    if: always()
+    needs: [changes, checks, go, test, console]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          ! grep -qE '"(failure|cancelled)"' <<< "$RESULTS"
