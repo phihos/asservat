@@ -27,7 +27,7 @@ pod while the problem happens and gives you each piece in its standard format:
 | Packet capture | PCAPNG filtered with tcpdump syntax; peers named by Kubernetes Service and Pod. Packet headers by default, full payloads with payload approval | Continuously |
 | HTTP headers | Header fields you allow, as JSON, for live views and AI agents without payload approval. Bodies come with the full packet capture | Continuously |
 | Core dump | ELF core, plus the matching executable and libraries when available | On trigger |
-| Runtime profile | Go CPU, heap and mutex profiles and execution traces from the pod's pprof endpoint | On trigger |
+| Runtime profile | CPU profiles for Go, Java, Python, Node.js, .NET, Ruby, PHP and native code, sampled from the kernel without touching the process; heap, allocation and lock profiles for Go and Java | On trigger |
 | Syscall trace | System calls with timing and results; argument memory is not read by default | Continuously |
 | Files and commands | Files and `/proc` entries from the pod, and the output of commands you define | On trigger |
 
