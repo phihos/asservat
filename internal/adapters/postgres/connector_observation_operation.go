@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -55,8 +56,11 @@ func (s *ConnectorObservationOperationRegistry) readOperation(ctx context.Contex
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	first, err := source.ReadConnectorObservationValue(call, ordinal)
-	if err != nil || !first.Matches(s.pin, request, ordinal, time.Now()) || first.Certificate != leaf || call.Err() != nil {
-		return zero, value.ErrUnavailable
+	if err != nil {
+		return zero, registryStep("first-read", err)
+	}
+	if !first.Matches(s.pin, request, ordinal, time.Now()) || first.Certificate != leaf || call.Err() != nil {
+		return zero, registryStep(expiredStep(first, "first"), nil)
 	}
 	first = first.Clone()
 	until = identity.Earlier(until, first.Until())
@@ -64,7 +68,7 @@ func (s *ConnectorObservationOperationRegistry) readOperation(ctx context.Contex
 	defer stop()
 	registered, err := readConnectorActivatedLeaf(bounded, query, s.pin.Profile, leaf.Binding, leaf.Usage, leaf.Digest, first.Native.Source, until)
 	if err != nil || registered.Certificate != leaf || registered.Process != first.Native.Workload.Process {
-		return zero, value.ErrUnavailable
+		return zero, registryStep("leaf", err)
 	}
 	// SQL's returned current interval can shorten the last actual source read;
 	// it can never replace it. No second source call follows failed SQL.
@@ -72,13 +76,46 @@ func (s *ConnectorObservationOperationRegistry) readOperation(ctx context.Contex
 	final, stopFinal := context.WithDeadline(bounded, until)
 	defer stopFinal()
 	last, err := source.ReadConnectorObservationValue(final, ordinal+1)
-	if err != nil || !last.Matches(s.pin, request, ordinal+1, time.Now()) || !last.Continues(first) || !first.Matches(s.pin, request, ordinal, time.Now()) || final.Err() != nil {
-		return zero, value.ErrUnavailable
+	switch {
+	case err != nil:
+		return zero, registryStep("last-read", err)
+	case !last.Matches(s.pin, request, ordinal+1, time.Now()):
+		return zero, registryStep(expiredStep(last, "last"), nil)
+	case !last.Continues(first):
+		return zero, registryStep("continues", nil)
+	case !first.Matches(s.pin, request, ordinal, time.Now()):
+		return zero, registryStep(expiredStep(first, "first-again"), nil)
+	case final.Err() != nil:
+		return zero, registryStep("deadline", nil)
 	}
 	until = identity.Earlier(until, last.Until())
 	registered.FreshUntil = identity.Earlier(registered.FreshUntil, until)
 	if !registered.Valid(time.Now()) || !time.Now().Before(until) {
-		return zero, value.ErrUnavailable
+		return zero, registryStep("valid", nil)
 	}
 	return app.ConnectorObservationOperationRegistration{Registration: registered, Last: last.Clone()}, nil
 }
+
+// expiredStep labels a refused value "-expired" when its observed bounds have
+// passed, otherwise "-match". It only names an already decided refusal.
+func expiredStep(v value.ConnectorObservationOperationValue, name string) string {
+	if !time.Now().Before(v.Until()) {
+		return name + "-expired"
+	}
+	return name + "-match"
+}
+
+// registryStep names the fixed registry check that refused, for operator
+// diagnostics (FixedStep); it always matches value.ErrUnavailable.
+type registryStepError struct {
+	step string
+	err  error
+}
+
+func registryStep(step string, cause error) error {
+	return &registryStepError{step, errors.Join(value.ErrUnavailable, cause)}
+}
+
+func (e *registryStepError) Error() string     { return e.step }
+func (e *registryStepError) Unwrap() error     { return e.err }
+func (e *registryStepError) FixedStep() string { return e.step }

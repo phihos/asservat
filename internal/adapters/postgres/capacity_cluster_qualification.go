@@ -6,8 +6,8 @@ import (
 	"slices"
 	"time"
 
-	capacity "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	capacity "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"

@@ -372,3 +372,11 @@ regional slot.
     observation across hub-worker, hub-api and region, with 51 requests
     spending 76 ms in the API server: most of each 2.4–2.8 s observation
     is client-side 20 QPS limiting.
+  - [CI run 5](../../test/results/adr197-continuation-ci-5/native-continuation-1/context-storage-environment.json)
+    (run 39033973438): the refusals are `observe/conversation/registration-1`
+    and `registration-3`, occasionally `exchange`: the hub's SQL registry
+    read of two consecutive native values around the activated-leaf check.
+    The region completed read 3 fifteen times but read 4 only nine times,
+    so registration-3 often stops between the reads (value check or SQL);
+    registration-1 fails after both reads. The registry now names each
+    check, distinguishing expired values from mismatches.
