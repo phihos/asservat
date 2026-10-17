@@ -36,19 +36,19 @@ import (
 // process cannot initialize them, accept profiles or clear RecoveryBlocked.
 type OwnerDeployment struct {
 	observerStats, operationStats regionalAPIStats
-	Runtime       *OwnerRuntime
-	Router        *evidence.WorkerEnrollmentRouter
-	inputs        *ownerInputs
-	trust         *mtls.WorkerTrustCatalog
-	root          context.Context
-	cancel        context.CancelFunc
-	closers       []func()
-	mu            sync.Mutex
-	closed        bool
-	running       bool
-	owners        sync.WaitGroup
-	once          sync.Once
-	catalogDigest [32]byte
+	Runtime                       *OwnerRuntime
+	Router                        *evidence.WorkerEnrollmentRouter
+	inputs                        *ownerInputs
+	trust                         *mtls.WorkerTrustCatalog
+	root                          context.Context
+	cancel                        context.CancelFunc
+	closers                       []func()
+	mu                            sync.Mutex
+	closed                        bool
+	running                       bool
+	owners                        sync.WaitGroup
+	once                          sync.Once
+	catalogDigest                 [32]byte
 	// public holds the ADR-180 public purpose pools, identity and context
 	// services; all nil without Public. shared is the native composition's
 	// retention topology and effect guards, reused by the public layer.

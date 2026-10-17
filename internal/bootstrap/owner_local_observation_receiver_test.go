@@ -90,7 +90,7 @@ func newLocalReceiverFixture(t *testing.T, mode string) *localReceiverFixture {
 	f.native = &localReceiverNativeFixture{base: receiverNativeFixture{pin: base.owner.pin, mode: mode}, mode: mode}
 	receiver, err := newOwnerLocalObservationReceiver(base.root, base.owner.pin, base.keys, base.registry, f.native, base.holder, 1, time.Now)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("newOwnerLocalObservationReceiver", err)
 	}
 	f.receiver = receiver
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +108,7 @@ func newLocalReceiverFixture(t *testing.T, mode string) *localReceiverFixture {
 	f.server = server
 	serving, err := mtls.NewOwnerBootstrapServing(base.keys, base.owner.pin.Pool)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("mtls.NewOwnerBootstrapServing", err)
 	}
 	server.Config.ConnContext = func(context.Context, net.Conn) context.Context { return base.root }
 	server.EnableHTTP2 = true

@@ -22,6 +22,7 @@ func ownerObservationDigest(s string) artifact.Digest {
 	copy(out[:], b)
 	return out
 }
+
 // projected requires the activation the owner projection attaches.
 func validateOwnerObservationInputs(c *contracts.OwnerObservationBootstrap, projected bool) error {
 	if c == nil {

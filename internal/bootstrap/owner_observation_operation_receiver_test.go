@@ -142,63 +142,63 @@ func newOperationReceiverFixture(t *testing.T, mode string) *operationReceiverFi
 	owner.servers = []value.OwnerBinding{binding}
 	keys, e := mtls.NewOwnerCredentialsForPool(binding, "server", pin.Pool, base.roots, owner, owner, time.Now)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("mtls.NewOwnerCredentialsForPool", e)
 	}
 	f.keys = keys
 	t.Cleanup(keys.Close)
 	if e = keys.Enroll(root); e != nil {
-		t.Fatal(e)
+		t.Fatal("keys.Enroll", e)
 	}
 	senderBinding := binding
 	senderBinding.PodUID = observationForwardID(11)
 	senderBinding.ProcessEpoch = observationForwardID(31)
 	sender, e := mtls.NewOwnerCredentialsForPool(senderBinding, "client", pin.Pool, base.roots, owner, owner, time.Now)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("mtls.NewOwnerCredentialsForPool", e)
 	}
 	f.sender = sender
 	t.Cleanup(sender.Close)
 	if e = sender.Enroll(root); e != nil {
-		t.Fatal(e)
+		t.Fatal("sender.Enroll", e)
 	}
 	regional := &framedRegionalFixture{base: base, now: time.Now().UTC().Truncate(time.Second), issued: make(map[artifact.Digest]value.IssuedConnectorCredential), mode: mode}
 	f.regional = regional
 	regional.pin = value.ConnectorObservationPin{Profile: value.ConnectorCredentialProfile{RootID: pin.RootID, Binding: value.PeerBinding{InstallationID: runtimeID, ClusterID: observationForwardID(502), IssuerEpoch: runtimeID, PeerID: observationForwardID(503), Role: value.ConnectorPeer}, Revision: identity.Revision{UID: observationForwardID(504), Generation: 1, Digest: artifact.Digest{33}}, ProtectionDigest: artifact.Digest{34}, ServerName: "connector.example.invalid", Deployment: value.ConnectorDeployment{Namespace: "connector", NamespaceUID: runtimeID, ServiceAccount: "connector", AccountUID: runtimeID, Deployment: "connector", DeploymentUID: runtimeID, ServingSlots: 2, RetainedProcesses: 8}, ClientIssuerRoots: [][]byte{base.ca.Raw}, ServerIssuerRoots: [][]byte{base.ca.Raw}}, Roles: value.ConnectorIdentityRoles{Source: "source", Journal: "journal", Acknowledgement: "ack", Cleanup: "cleanup", Verifier: "verifier", Finalizer: "finalizer"}, TemplateDigest: artifact.Digest{35}, ImageDigest: artifact.Digest{36}, ProtectionDigest: artifact.Digest{37}}
 	credentials, e := mtls.NewConnectorProcessCredentials(root, regional.pin.Profile, observationForwardID(505), regional, regional, regional, regional, time.Now)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("mtls.NewConnectorProcessCredentials", e)
 	}
 	t.Cleanup(credentials.Close)
 	if e = credentials.Reconcile(root); e != nil {
-		t.Fatal(e)
+		t.Fatal("credentials.Reconcile", e)
 	}
 	producer, e := mtls.NewConnectorObservationOperationProducer(regional.pin, credentials, regional, time.Now)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("mtls.NewConnectorObservationOperationProducer", e)
 	}
 	ingress, e := mtls.NewOwnerObservationOperationIngress(pin, keys, []mtls.OwnerObservationPeer{{Binding: regional.pin.Profile.Binding, Roots: regional.pin.Profile.ClientIssuerRoots}}, time.Now)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("mtls.NewOwnerObservationOperationIngress", e)
 	}
 	common, _ := mtls.OwnerBootstrapServerName(pin.Pool)
 	holder, e := wire.NewHubObservationOperationHolder(root, 1, time.Now)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("wire.NewHubObservationOperationHolder", e)
 	}
 	f.holder = holder
 	handler, e = regionalObservationOperationHandler(net.JoinHostPort(common, port), holder, regional.pin, ingress, regional, time.Now)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("regionalObservationOperationHandler", e)
 	}
 	f.native = &receiverNativeFixture{pin: pin, mode: mode, beginEntered: make(chan struct{}), beginCancelled: make(chan struct{}), beginRelease: make(chan struct{})}
 	f.registry = &receiverOwnerRegistry{OwnerCertificateRegistry: owner}
 	f.receiver, e = newOwnerObservationOperationReceiver(root, pin, keys, base.roots, f.registry, f.native, holder, 1, time.Now)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("newOwnerObservationOperationReceiver", e)
 	}
 	serving, e := mtls.NewOwnerBootstrapServing(keys, pin.Pool)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("mtls.NewOwnerBootstrapServing", e)
 	}
 	server.Config.ConnContext = func(context.Context, net.Conn) context.Context { return root }
 	server.EnableHTTP2 = true
@@ -206,7 +206,7 @@ func newOperationReceiverFixture(t *testing.T, mode string) *operationReceiverFi
 	server.StartTLS()
 	client, e := mtls.NewConnectorObservationOperationClient(root, pin, server.Listener.Addr().String(), base.roots, producer, owner, owner, regional, 1, time.Now)
 	if e != nil {
-		t.Fatal(e)
+		t.Fatal("mtls.NewConnectorObservationOperationClient", e)
 	}
 	t.Cleanup(client.Close)
 	stream, e := client.Open(root, observationForwardID(506))

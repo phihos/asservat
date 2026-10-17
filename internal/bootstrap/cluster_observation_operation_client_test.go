@@ -88,7 +88,7 @@ func directHolderFixture(t *testing.T, mode string) (*DirectHolderObservationCli
 	registry := &localDirectRegistry{OwnerCertificateRegistry: f.base.owner, f: f, mode: mode}
 	c, err := newDirectHolderObservationClient(f.base.root, f.base.owner.pin, observationForwardID(701), f.base.base.roots, f.base.owner, registry, inputs, native, inputs, 2, time.Now)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("newDirectHolderObservationClient", err)
 	}
 	c.dial = func(ctx context.Context, network, address string) (net.Conn, error) {
 		return (&net.Dialer{}).DialContext(ctx, network, f.server.Listener.Addr().String())
