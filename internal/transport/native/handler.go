@@ -304,7 +304,17 @@ func (s *serverStream) send(ctx context.Context, f contracts.NativeFrame, termin
 	// original gate snapshot after the hub may have retired itself. Successful
 	// flush completes only transport delivery; application metadata authority
 	// and accounting still have their independent final gates.
-	if err == nil && f.Kind != contracts.NativeDoneFrame {
+	if f.Kind == contracts.NativeDoneFrame {
+		// The peer closing its stream, or the hub retiring the gate, after a
+		// flushed Done is its normal end, not a failed delivery; the stream
+		// and gate contexts are checked before the write only.
+		if err != nil {
+			s.interrupt()
+			return contracts.ErrNativeProtocol
+		}
+		return nil
+	}
+	if err == nil {
 		_, err = s.gate.Check(call)
 	}
 	deadline, bounded := call.Deadline()
