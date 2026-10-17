@@ -65,32 +65,35 @@ func (s *bindingRun) guardedSnapshot(ctx context.Context, first PermissionTrust)
 }
 func (s *bindingRun) accept(ctx context.Context, refresh bool) error {
 	if !s.r.Now().Before(s.trustUntil) {
-		return value.ErrUnavailable
+		return reconcileStep("trust-expired", value.ErrUnavailable)
 	}
 	if err := s.journal.Constrain(s.trustUntil); err != nil {
-		return err
+		return reconcileStep("constrain", err)
 	}
 	b, err := s.journal.Prepare(s.fence, s.r.NewID(), s.r.Now())
 	if err != nil {
-		return err
+		return reconcileStep("prepare", err)
 	}
 	if refresh {
 		err = s.r.Store.RefreshPermissions(ctx, b)
 		if err == nil {
-			return s.journal.Refreshed(b.RequestID)
+			if err = s.journal.Refreshed(b.RequestID); err != nil {
+				return reconcileStep("refreshed", err)
+			}
+			return nil
 		}
 		// Identical input may have an expired member. Accept that removal as a
 		// new transition; an epoch/sequence conflict still fails in the store.
 		if !errors.Is(err, value.ErrChanged) {
-			return err
+			return reconcileStep("store-refresh", err)
 		}
 	}
 	accepted, err := s.r.Store.AcceptPermissions(ctx, b)
 	if err != nil {
-		return err
+		return reconcileStep("store-accept", err)
 	}
 	if err = s.journal.Accepted(accepted); err != nil {
-		return err
+		return reconcileStep("accepted", err)
 	}
 	s.fence = accepted.PermissionFence
 	return nil
@@ -98,19 +101,19 @@ func (s *bindingRun) accept(ctx context.Context, refresh bool) error {
 func (s *bindingRun) start(ctx context.Context) error {
 	first, err := s.r.trust(ctx)
 	if err != nil {
-		return err
+		return reconcileStep("trust", err)
 	}
 	s.fence, err = s.r.Store.BeginPermissions(ctx, s.r.RootID, s.r.NewID(), first.Digest)
 	if err != nil {
-		return err
+		return reconcileStep("begin", err)
 	}
 	snapshot, err := s.guardedSnapshot(ctx, first)
 	if err != nil {
-		return err
+		return reconcileStep("snapshot", err)
 	}
 	s.journal, err = NewBindingJournal(snapshot, s.r.Now())
 	if err != nil {
-		return err
+		return reconcileStep("journal", err)
 	}
 	if !s.fence.Initialized && len(snapshot.Bindings) > 0 {
 		if s.r.Review == nil {
@@ -118,13 +121,16 @@ func (s *bindingRun) start(ctx context.Context) error {
 		}
 		review, e := s.r.Review.InitialPermissionReview(ctx)
 		if e != nil {
-			return e
+			return reconcileStep("review", e)
 		}
 		if err = s.journal.SetInitialReview(review, s.r.Now()); err != nil {
-			return err
+			return reconcileStep("review", err)
 		}
 	}
-	return s.accept(ctx, false)
+	if err = s.accept(ctx, false); err != nil {
+		return reconcileStep("accept", err)
+	}
+	return nil
 }
 
 var errWatchBehind = errors.New("permission watch has not reached current complete list")
@@ -132,27 +138,30 @@ var errWatchBehind = errors.New("permission watch has not reached current comple
 func (s *bindingRun) refresh(ctx context.Context) error {
 	first, err := s.r.trust(ctx)
 	if err != nil {
-		return err
+		return reconcileStep("trust", err)
 	}
 	snapshot, err := s.guardedSnapshot(ctx, first)
 	if err != nil {
-		return err
+		return reconcileStep("snapshot", err)
 	}
 	if err = s.journal.Confirm(snapshot, s.r.Now()); err != nil {
 		// Do not replace a journal with a newer LIST and thereby skip an
 		// intermediate owner. Process queued events, then retry the full LIST.
 		if !s.r.Now().Before(s.journal.until) {
-			return value.ErrUnavailable
+			return reconcileStep("confirm-expired", value.ErrUnavailable)
 		}
 		return errWatchBehind
 	}
 	if s.fence.LeaseUntil.Sub(s.r.Now()) < 10*time.Second {
 		s.fence, err = s.r.Store.RenewPermissions(ctx, s.fence)
 		if err != nil {
-			return err
+			return reconcileStep("renew", err)
 		}
 	}
-	return s.accept(ctx, true)
+	if err = s.accept(ctx, true); err != nil {
+		return reconcileStep("accept", err)
+	}
+	return nil
 }
 
 // Run keeps event delivery bounded to one queued transition and processes each
@@ -174,14 +183,14 @@ func (r BindingReconciler) Run(ctx context.Context) error {
 		}
 	}()
 	if err := s.start(ctx); err != nil {
-		return err
+		return reconcileStep("start", err)
 	}
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 	for {
 		watch, err := r.Watcher.WatchBindings(ctx, s.journal.Cursor())
 		if err != nil {
-			return err
+			return reconcileStep("watch", err)
 		}
 		err = s.consume(ctx, watch, ticker.C)
 		if !errors.Is(err, io.EOF) {
@@ -218,20 +227,45 @@ func (s *bindingRun) consume(ctx context.Context, watch BindingWatch, ticks <-ch
 			return ctx.Err()
 		case <-ticks:
 			if err := s.refresh(ctx); err != nil && !errors.Is(err, errWatchBehind) {
-				return err
+				return reconcileStep("refresh", err)
 			}
 		case item := <-queue:
 			if item.err != nil {
-				return item.err
+				if errors.Is(item.err, io.EOF) {
+					return item.err
+				}
+				return reconcileStep("watch-next", item.err)
 			}
 			if err := s.journal.Apply(item.event); err != nil {
-				return err
+				return reconcileStep("apply", err)
 			}
 			if item.event.Type != "BOOKMARK" {
 				if err := s.accept(ctx, false); err != nil {
-					return err
+					return reconcileStep("accept", err)
 				}
 			}
 		}
 	}
+}
+
+// reconcileStepError names the phase that stopped a permission epoch; the
+// hub-worker logs it (ADR-197 runs 23a/23b: repeated stops, no cause). Labels
+// compose with nested fixed steps. Error deliberately returns only the step,
+// a closed word safe to log; read the cause with errors.Is and the full chain
+// with FixedStep.
+type reconcileStepError struct {
+	step string
+	err  error
+}
+
+func reconcileStep(step string, err error) error { return &reconcileStepError{step, err} }
+
+func (e *reconcileStepError) Error() string { return e.step }
+func (e *reconcileStepError) Unwrap() error { return e.err }
+func (e *reconcileStepError) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
 }

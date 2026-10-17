@@ -98,3 +98,22 @@ always be refused.
   every 250 ms for 15 s after the demand and requires three refreshes and one
   sample with a second left, and each demand outcome is logged with the
   guarded read's freshness left on return.
+- [CI continuation runs 23a/23b](../../test/results/adr200-continuation-ci-23a/native-continuation-1/context-storage-environment.json)
+  (39070667782, 39070672636) failed before the demand check: the regional
+  workload never enrolled. The hub-worker's permission reconciler stopped
+  repeatedly (`permission reconciler stopped: unavailable`, retried every 31
+  s); without a renewed permission stream PostgreSQL refused
+  `accept_capacity_source` (40 times in 23a), so no capacity source was
+  current and every workload attempt ended at `source`. The same chain explains
+  run 18b. The reconciler now names the phase that stopped it (`start`,
+  `watch`, `watch-next`, `apply`, `accept`, and inside `refresh`: `trust`,
+  `snapshot`, `confirm-expired`, `renew`, `accept`).
+- [CI continuation runs 24a–24c](../../test/results/adr200-continuation-ci-24a/native-continuation-1/context-storage-environment.json)
+  (39072929605, 39072934693, 39072939641): **24a passed the demand check**:
+  after one refresh demand the regional binding had five distinct
+  observations and seven samples with at least one second of freshness left in
+  15 s. 24b and 24c never enrolled, again because the permission reconciler
+  stopped, at `refresh/confirm-expired`, `refresh/accept` and `start`. The
+  reconciler's `start` and `accept` phases are now labelled one level deeper,
+  with `trust-expired` separating an expired trust window from a store
+  refusal.

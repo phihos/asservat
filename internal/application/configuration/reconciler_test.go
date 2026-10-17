@@ -27,6 +27,7 @@ type reconciliationFixture struct {
 	events      []value.BindingEvent
 	finished    chan struct{}
 	ids         int
+	failAccept  error
 }
 
 func (f *reconciliationFixture) PermissionSnapshot(context.Context) (value.Snapshot, error) {
@@ -58,6 +59,9 @@ func (f *reconciliationFixture) RenewPermissions(context.Context, value.Permissi
 func (f *reconciliationFixture) AcceptPermissions(_ context.Context, b value.PermissionBatch) (value.PermissionAcceptance, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.failAccept != nil {
+		return value.PermissionAcceptance{}, f.failAccept
+	}
 	if !f.storeFence.Initialized && (b.Initial == nil || !b.Initial.Valid(b.ObservedAt)) {
 		return value.PermissionAcceptance{}, value.ErrDenied
 	}
@@ -213,5 +217,28 @@ func TestBindingReconcilerListCannotSkipPendingOwner(t *testing.T) {
 	}
 	if len(f.accepted) != 1 || s.journal.Cursor() != f.snapshot.BindingResourceVersion {
 		t.Fatal("full list skipped watch history")
+	}
+}
+
+// The hub-worker logs FixedStep for a stopped epoch; a dropped or renamed
+// label would hide where the reconciler stops (ADR-197 runs 23-24).
+func TestBindingReconcilerNamesTheStoppingPhase(t *testing.T) {
+	for _, c := range []struct {
+		name, want string
+		setup      func(*reconciliationFixture, *BindingReconciler)
+	}{
+		{"unreviewed bootstrap", "start", func(_ *reconciliationFixture, r *BindingReconciler) { r.Review = nil }},
+		{"guard change during the list", "start/snapshot", func(f *reconciliationFixture, _ *BindingReconciler) { f.drift = true }},
+		{"store refuses the batch", "start/accept/store-accept", func(f *reconciliationFixture, _ *BindingReconciler) { f.failAccept = value.ErrUnavailable }},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f, r := reconciliationTest(t)
+			c.setup(f, &r)
+			err := r.Run(context.Background())
+			var step interface{ FixedStep() string }
+			if !errors.As(err, &step) || step.FixedStep() != c.want {
+				t.Fatalf("stopped with %v, want step %q", err, c.want)
+			}
+		})
 	}
 }
