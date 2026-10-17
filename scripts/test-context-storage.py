@@ -29,6 +29,8 @@ BAO = "quay.io/openbao/openbao@sha256:6d2b93856e3fcf7b18ad855a0b51eaba474dc8b79c
 NODE = "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 PAUSE = "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a"
 POSTGRES = "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
+# The identity suite's pinned Keycloak (scripts/test-identity.py).
+KEYCLOAK = "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc"
 
 
 def run(args, *, data=None):
@@ -160,6 +162,59 @@ def qualification_environment(base, fixture_path, work, initial_handover, initia
         env["ASSERVAT_INITIAL_RUNTIME_PROVIDER_OWNER"] = "1"
     env["TMPDIR"] = str(work)
     return env
+
+
+def start_keycloak(work, network, run_id, containers, report):
+    """An owned TLS Keycloak on the private network, reachable by IP from the
+    kind nodes and the test process. Its certificate names its container IP,
+    which exists only after start, so the entrypoint waits for the key file."""
+    import secrets
+    import ssl
+    certs = work/"keycloak"
+    certs.mkdir()
+    certs.chmod(0o755)
+    admin_password, user_password = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
+    env = work/"keycloak.env"
+    env.write_text(f"KC_BOOTSTRAP_ADMIN_USERNAME=fixture-admin\nKC_BOOTSTRAP_ADMIN_PASSWORD={admin_password}\n")
+    env.chmod(0o600)
+    full = network+"-keycloak"
+    start = ("while [ ! -s /fixture/key.pem ]; do sleep 0.2; done; exec /opt/keycloak/bin/kc.sh start --db=dev-file --http-enabled=false "
+             "--https-port=8443 --https-certificate-file=/fixture/cert.pem --https-certificate-key-file=/fixture/key.pem "
+             "--hostname \"https://$(cat /fixture/ip):8443\" --cache=local --health-enabled=false --metrics-enabled=false")
+    run(["docker", "create", "--name", full, "--network", network, "--label", "asservat.test="+run_id, "--memory", "1536m", "--cpus", "2",
+         "--pids-limit", "512", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--env-file", str(env),
+         "--mount", f"type=bind,src={certs},dst=/fixture,readonly", "--entrypoint", "/bin/bash", KEYCLOAK, "-c", start])
+    containers.append(full)
+    run(["docker", "start", full])
+    ip = json.loads(run(["docker", "inspect", full]))[0]["NetworkSettings"]["Networks"][network]["IPAddress"]
+    # A one-day synthetic CA (installed provider roots must be CA certificates)
+    # and Keycloak's leaf for its container IP.
+    ca_key, ca = work/"keycloak-ca-key.pem", work/"keycloak-ca.pem"
+    run(["openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256", "-nodes", "-days", "1", "-subj", "/CN=synthetic-keycloak-root",
+         "-addext", "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign,cRLSign", "-keyout", str(ca_key), "-out", str(ca)])
+    run(["openssl", "req", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:P-256", "-nodes", "-subj", "/CN="+ip, "-keyout", str(work/"keycloak-key.pem"), "-out", str(work/"keycloak.csr")])
+    (work/"keycloak.ext").write_text(f"subjectAltName=IP:{ip}\nextendedKeyUsage=serverAuth\nkeyUsage=critical,digitalSignature\nbasicConstraints=critical,CA:FALSE\n")
+    run(["openssl", "x509", "-req", "-in", str(work/"keycloak.csr"), "-CA", str(ca), "-CAkey", str(ca_key), "-CAcreateserial", "-days", "1",
+         "-extfile", str(work/"keycloak.ext"), "-out", str(certs/"cert.pem")])
+    (certs/"ip").write_text(ip)
+    (certs/"cert.pem").chmod(0o444)
+    (certs/"ip").chmod(0o444)
+    key = (work/"keycloak-key.pem").read_bytes()
+    (certs/"key.pem").write_bytes(key)  # written last: it starts Keycloak
+    (certs/"key.pem").chmod(0o444)
+    tls = ssl.create_default_context(cafile=str(ca))
+    for _ in range(180):
+        try:
+            with urllib.request.urlopen(f"https://{ip}:8443/realms/master/.well-known/openid-configuration", context=tls, timeout=2) as response:
+                if response.status == 200:
+                    break
+        except (OSError, ValueError):
+            pass
+        time.sleep(1)
+    else:
+        raise RuntimeError("owned Keycloak not ready")
+    report["keycloak"] = {"image": KEYCLOAK, "address": ip, "scope": "synthetic realm and user; private network only"}
+    return {"base": f"https://{ip}:8443", "rootCA": ca.read_text(), "adminUser": "fixture-admin", "adminPassword": admin_password, "userPassword": user_password}
 
 
 def prepare_fixture_database(cache, work, dsn, pgname, initial_schema_handover):
@@ -407,6 +462,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     time.sleep(.25)
                 else: raise RuntimeError("fixture did not become ready")
             fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "nativeProviders":native_providers, "clusters": []}
+            if installer_continuation:
+                fixture["identity"] = start_keycloak(work, network, run_id, containers, report)
             if direct_observation:
                 fixture["directObservation"] = report["directObservation"]
             if helm_bootstrap:
