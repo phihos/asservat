@@ -186,6 +186,19 @@ func TestNativeHandlerActualDuplexAndCurrentRevocation(t *testing.T) {
 			if mode == "revoked" && e == nil {
 				t.Fatal("known revocation acknowledged")
 			}
+			// The server's Send runs its post-flush authority check while the
+			// stream is open; closing first can turn delivery into an uncertain
+			// failure, so the record is awaited before Close.
+			if mode == "success" {
+				select {
+				case b := <-emitted:
+					if string(b) != "body" {
+						t.Fatal("unexpected data")
+					}
+				case <-time.After(time.Second):
+					t.Fatal("actual data missing")
+				}
+			}
 			s.Close()
 			select {
 			case <-a.closed:
@@ -196,14 +209,9 @@ func TestNativeHandlerActualDuplexAndCurrentRevocation(t *testing.T) {
 				t.Fatal("replayed admission")
 			}
 			select {
-			case b := <-emitted:
-				if mode != "success" || string(b) != "body" {
-					t.Fatal("unexpected data")
-				}
+			case <-emitted:
+				t.Fatal("unexpected data")
 			default:
-				if mode == "success" {
-					t.Fatal("actual data missing")
-				}
 			}
 		})
 	}
