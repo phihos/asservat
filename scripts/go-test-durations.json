@@ -39,7 +39,7 @@
 "TestClusterCredentialSecretCompareAndSwap": 0.0,
 "TestClusterObservationCallerExactNativeReadBoundary": 3.8,
 "TestClusterObservationMetadataConstructorRequiresExactClients": 0.1,
-"TestClusterObservationMetadataFourPurposesPreserveOriginalBounds": 0.8,
+"TestClusterObservationMetadataPurposesPreserveOriginalBounds": 0.8,
 "TestClusterObservationMetadataGuardChangeAndCancellation": 0.2,
 "TestClusterObservationMetadataRejectsChangedOrUnavailablePage": 0.8,
 "TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO": 0.7,

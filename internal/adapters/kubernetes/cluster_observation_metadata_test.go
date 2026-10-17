@@ -177,14 +177,14 @@ func (f *observationMetadataFixture) request(purpose fleet.ClusterObservationPur
 		r.Continue = "original-cursor"
 	case fleet.ObserveCapacityWorkloads:
 		r.Namespace, r.Kind, r.Continue = cfg.NamespaceRef{Name: "payments", UID: "payments-uid"}, "Deployment", "original-cursor"
-	case fleet.ObserveCapacityWorkload:
+	case fleet.ObserveCapacityWorkload, fleet.ObserveCapacityGuardedWorkload:
 		r.Namespace, r.Workload, r.Keys = cfg.NamespaceRef{Name: "payments", UID: "payments-uid"}, cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload-uid"}, []string{"capacity.example/team"}
 	}
 	return r
 }
 
-func TestClusterObservationMetadataFourPurposesPreserveOriginalBounds(t *testing.T) {
-	for _, purpose := range []fleet.ClusterObservationPurpose{fleet.ObserveCapacityNamespaceGuard, fleet.ObserveCapacityNamespaces, fleet.ObserveCapacityWorkloads, fleet.ObserveCapacityWorkload} {
+func TestClusterObservationMetadataPurposesPreserveOriginalBounds(t *testing.T) {
+	for _, purpose := range []fleet.ClusterObservationPurpose{fleet.ObserveCapacityNamespaceGuard, fleet.ObserveCapacityNamespaces, fleet.ObserveCapacityWorkloads, fleet.ObserveCapacityWorkload, fleet.ObserveCapacityGuardedWorkload} {
 		for _, callerFirst := range []bool{false, true} {
 			t.Run(string(purpose)+"/"+map[bool]string{false: "request-bound", true: "caller-bound"}[callerFirst], func(t *testing.T) {
 				f := observationMetadataTestFixture(t, "valid")
@@ -213,6 +213,16 @@ func TestClusterObservationMetadataFourPurposesPreserveOriginalBounds(t *testing
 				case fleet.ObserveCapacityWorkloads:
 					if f.calls.Load() != 3 || f.namespaces.Load() != 2 || f.lists.Load() != 1 || len(out.Workloads.Items) != 1 || out.Workloads.ResourceVersion != "page-rv" {
 						t.Fatal("exact namespace brackets or original single LIST lost")
+					}
+				case fleet.ObserveCapacityGuardedWorkload:
+					// ADR-197: one combined observation. Its exact call count is
+					// part of the regional exchange's limiter budget (CI run 10);
+					// a new call must be weighed against that budget, not slipped in.
+					if f.calls.Load() != 16 || f.probes.Load() != 1 || f.namespaces.Load() != 2 {
+						t.Fatalf("guarded observation call budget changed: calls=%d probes=%d namespaces=%d", f.calls.Load(), f.probes.Load(), f.namespaces.Load())
+					}
+					if out.Guard.Digest != f.reader.guard.guard.digest || len(out.Workload.Labels) != 1 || out.Workload.Labels["capacity.example/team"] != "core" || !out.Guard.Interval.FreshUntil.Equal(want) || !out.Workload.Interval.FreshUntil.Equal(want) {
+						t.Fatal("combined guard and workload observation lost its exact proof or scope")
 					}
 				case fleet.ObserveCapacityWorkload:
 					if f.calls.Load() != 4 || f.namespaces.Load() != 2 || len(out.Workload.Labels) != 1 || out.Workload.Labels["capacity.example/team"] != "core" || !out.Workload.Interval.FreshUntil.Equal(want) || !out.Workload.NamespaceInterval.FreshUntil.Equal(want) {

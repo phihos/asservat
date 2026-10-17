@@ -70,9 +70,9 @@ func newRegionalCapacity(ctx context.Context, c contracts.RegionalDeployment, in
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
 	out := &regionalCapacity{c: k, tokens: regionalPodToken{in}, lifecycle: lifecycle, timed: &regionalCapacityTimed{stats: &regionalAPIStats{}}}
 	var err error
-	observerConfig := in.kubernetes("kube-observer.token")
-	observerConfig.Wrap(out.timed.stats.wrap)
-	if out.observer, err = kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now); err != nil {
+	probeNS := cfg.NamespaceRef{Name: k.ProbeNamespace.Name, UID: k.ProbeNamespace.UID}
+	var read *kube.PermissionClient
+	if out.observer, read, err = regionalCapacityClients(in, out.timed.stats, c.ClusterID, control, probeNS); err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
 	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
@@ -87,17 +87,6 @@ func newRegionalCapacity(ctx context.Context, c contracts.RegionalDeployment, in
 		return nil, closers, mounts.ErrUnavailable
 	}
 	if out.source, err = kube.NewConnectorIdentitySource(out.observer, protection, c.Source.Name, c.Source.UID, c.PermissionRootID, binding); err != nil {
-		return nil, closers, mounts.ErrUnavailable
-	}
-	probeNS := cfg.NamespaceRef{Name: k.ProbeNamespace.Name, UID: k.ProbeNamespace.UID}
-	// The capacity metadata (selector guard proof, workload reads, probe
-	// tokens) gets its own observer instance at the same fixed limit. Sharing
-	// the native reader's limiter let a guarded read's 14 calls starve the
-	// final native bracket (ADR-197 CI continuation run 10).
-	metadataConfig := in.kubernetes("kube-observer.token")
-	metadataConfig.Wrap(out.timed.stats.wrap)
-	read, err := kube.NewPermissionClient(metadataConfig, c.ClusterID, probeNS, time.Now)
-	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
 	tokens, err := kube.NewCapacityTokens(ctx, read, k.ProbeAccount.Name, k.ProbeAudience, podUID)
@@ -136,6 +125,26 @@ func newRegionalCapacity(ctx context.Context, c contracts.RegionalDeployment, in
 		return nil, closers, mounts.ErrUnavailable
 	}
 	return out, closers, nil
+}
+
+// regionalCapacityClients are the standby's native-reader observer and its
+// capacity metadata observer (selector guard proof, workload reads, probe
+// tokens): one identity, two client instances, each with its own fixed 20
+// QPS limiter. Sharing one let a guarded read's 14 metadata calls starve the
+// final native bracket (ADR-197 CI continuation run 10). Calls stay counted
+// together for the per-change timing lines.
+func regionalCapacityClients(in *providerInputs, stats *regionalAPIStats, cluster string, control, probe cfg.NamespaceRef) (observer, metadata *kube.PermissionClient, err error) {
+	observerConfig := in.kubernetes("kube-observer.token")
+	observerConfig.Wrap(stats.wrap)
+	if observer, err = kube.NewPermissionClient(observerConfig, cluster, control, time.Now); err != nil {
+		return nil, nil, err
+	}
+	metadataConfig := in.kubernetes("kube-observer.token")
+	metadataConfig.Wrap(stats.wrap)
+	if metadata, err = kube.NewPermissionClient(metadataConfig, cluster, probe, time.Now); err != nil {
+		return nil, nil, err
+	}
+	return observer, metadata, nil
 }
 
 // run composes the v2 client for the active process credentials and keeps

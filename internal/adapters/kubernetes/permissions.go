@@ -335,6 +335,13 @@ func (c *PermissionClient) NamespaceMetadata(ctx context.Context, q value.Namesp
 
 // NewPermissionClientFrom shares c's API connection and identity for another
 // pinned control namespace. It confers nothing beyond c's credential.
+// SharesLimiter reports whether both clients spend one client-side rate
+// limiter. Components that each need their own fixed budget are checked with
+// it; a NewPermissionClientFrom copy always shares its original's limiter.
+func (c *PermissionClient) SharesLimiter(o *PermissionClient) bool {
+	return c != nil && o != nil && c.api.GetRateLimiter() == o.api.GetRateLimiter()
+}
+
 func NewPermissionClientFrom(c *PermissionClient, control value.NamespaceRef) (*PermissionClient, error) {
 	if c == nil || !namespaceRefValid(control) {
 		return nil, value.ErrInvalid
