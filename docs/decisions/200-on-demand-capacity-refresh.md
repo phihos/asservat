@@ -117,3 +117,9 @@ always be refused.
   reconciler's `start` and `accept` phases are now labelled one level deeper,
   with `trust-expired` separating an expired trust window from a store
   refusal.
+- [CI continuation runs 25a–25c](../../test/results/adr200-continuation-ci-25a/native-continuation-1/context-storage-environment.json)
+  (39075218716, 39075224097, 39075229161): 25a and 25c **passed** (five and
+  six refreshes, eight and nine samples with a second left, in 15 s). 25b
+  failed earlier: the promoted owner's native port never became reachable
+  after a 1 min 44 s owner installation step. Three of the last six runs pass.
+
