@@ -4,6 +4,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
@@ -34,5 +35,30 @@ func TestRegionalCapacityClientsKeepSeparateLimiters(t *testing.T) {
 	copied, err := kube.NewPermissionClientFrom(observer, probe)
 	if err != nil || !copied.SharesLimiter(observer) {
 		t.Fatal("a scoped copy must report its shared limiter", err)
+	}
+}
+
+// ADR-197 runs 24a-c: the local observation path had shared the capacity
+// source and guard loops' observer and was throttled past its window.
+func TestCapacityLocalObservationClientsHaveTheirOwnLimiters(t *testing.T) {
+	server := httptest.NewTLSServer(nil)
+	defer server.Close()
+	files, err := os.OpenRoot(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer files.Close()
+	in := &providerInputs{files: files, kubernetesEndpoint: contracts.OwnerProviderEndpoint{Endpoint: server.URL, Roots: [][]byte{server.Certificate().Raw}}}
+	control := cfg.NamespaceRef{Name: "control", UID: runtimeID}
+	shared, err := kube.NewPermissionClient(in.kubernetes("observer.token"), runtimeID, control, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observer, probe, err := capacityLocalObservationClients(in, runtimeID, control, "observer.token", "probe.token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if observer.SharesLimiter(shared) || probe.SharesLimiter(shared) || observer.SharesLimiter(probe) {
+		t.Fatal("local observation clients share a limiter")
 	}
 }
