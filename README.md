@@ -1,6 +1,6 @@
 # Asservat
 
-**Catch the evidence before the pod restarts.** Asservat records packet captures,
+**Catch the evidence before the container restarts.** Asservat records packet captures,
 core dumps, profiles and logs from failing Kubernetes pods, for developers and
 their AI agents.
 
@@ -9,8 +9,8 @@ their AI agents.
 > [!WARNING]
 > **Early development: not usable yet.** Sign-in, permission checks, encrypted
 > storage, downloads and a small pod-status capture pass tests against real
-> Kubernetes, PostgreSQL, OpenBao and S3. Collection of everything else in the
-> following table is designed but not built, and there is no release. See
+> Kubernetes, PostgreSQL, OpenBao and S3. The other evidence types in the
+> following table are partly built or only designed, and there is no release. See
 > [implementation status](docs/implementation-status.md).
 
 ![Design prototype of the Asservat console with open cases, recording health and captures in progress](design/ui/previews/workspace.png)
@@ -18,14 +18,16 @@ their AI agents.
 
 ## What you can capture
 
-By the time someone is paged, the container has restarted and the packets are
-gone. Asservat records evidence on the failing pod while it happens. You get each
-piece as an ordinary file for the tool you already use:
+When a container restarts, its process memory, `/proc` state and the files it
+wrote outside its volumes are gone. Network traffic and system calls are never
+stored unless something records them. Asservat captures this evidence on the pod
+while the problem happens, and you get each piece as an ordinary file for the
+tool you already use:
 
 | Evidence | What you get | Open it with | Status |
 | --- | --- | --- | --- |
 | Pod state | Phase, readiness, container counts and restarts, as JSON | Console, any JSON tool | Tested |
-| Logs | Container logs from 30 s before to 10 s after the failure | Any text tool | Designed |
+| Logs | Container logs from 30 s before to 10 s after the trigger | Any text tool | Designed |
 | Packet capture | PCAPNG filtered with tcpdump syntax; peers named by Kubernetes Service and Pod | Wireshark, tcpdump | Designed |
 | HTTP headers | Header fields you allow, from captured HTTP traffic, as JSON; never bodies | Console, `jq` | Designed |
 | Core dump | ELF core, plus the matching executable and libraries when available | GDB, LLDB or another debugger | Designed |
@@ -33,8 +35,8 @@ piece as an ordinary file for the tool you already use:
 | Syscall trace | System calls with timing and results; argument memory is not read by default | Console, AI agent queries | Designed |
 | Files and commands | Files and `/proc` entries from the pod, and the output of commands you define | Any tool | Designed |
 
-Packet and syscall recorders can run continuously in a rolling buffer, so a
-trigger saves the seconds *before* the failure too. Every download shows its
+Packet and syscall recorders can run continuously in a rolling buffer, so when a
+trigger fires, the saved recording also covers the seconds *before* it. Every download shows its
 SHA-256 checksum and states what the capture missed. *Tested*: passes tests
 against real services. *Partly built*: acquisition works, the end-to-end path
 does not.
@@ -122,11 +124,11 @@ spec:
     value: 'panic:'
 ```
 
-When an `api` pod restarts, fails its liveness probe or logs `panic:`, Asservat
-saves up to 13 MiB of encrypted evidence: the pod's Kubernetes state and events,
-process status, network sockets, and logs from 30 seconds before to 10 seconds
-after. [More examples](examples/README.md) add packet captures, profiles and
-core dumps.
+When a container in an `api` pod restarts, fails its liveness probe or logs
+`panic:`, Asservat saves up to 13 MiB of encrypted evidence: the pod's
+Kubernetes state and events, process status, network sockets, and logs from 30
+seconds before to 10 seconds after the trigger. [More examples](examples/README.md)
+add packet captures, profiles and core dumps.
 
 ## Learn more
 
