@@ -72,6 +72,17 @@ fresh runner; their `test/results` output is uploaded as a run artifact. A CI ru
 is recorded like a local run: run URL, exit, selected tests and the harness's
 source hashes.
 
+For local debugging, `scripts/test-context-storage.py --keep-on-failure` leaves
+a failed run's own clusters and labelled containers (and the Go fixtures'
+objects) running and records them in a manifest under the build cache;
+`--cleanup-kept MANIFEST` later removes exactly those resources after checking
+each name or label against the run, and writes
+`test/results/kept-cleanup-<run>.json` as the cleanup evidence. A kept run is
+never a qualification result. The direct-observation suite
+(`scripts/ci-native.sh direct-observation`, about eight minutes) covers every
+regional capacity purpose, including the combined guarded workload, without
+the full installation replay.
+
 S-01/S-02 qualification includes the actual installed constructor and every
 nested authority/provider read on its successful path. Passing isolated
 components does not establish that their composition can finish. The recorded

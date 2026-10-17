@@ -572,6 +572,9 @@ func initialBootstrapChainAudit(t *testing.T, ctx context.Context, admin *pgxpoo
 }
 
 func initialBootstrapChainCleanup(t *testing.T, api kubernetes.Interface, d contracts.InitialBootstrap, bootstrapUID, roleUID, bindingUID types.UID) {
+	if keepFailedFixture(t) {
+		return
+	}
 	t.Helper()
 	ctx, end := context.WithTimeout(context.Background(), 60*time.Second)
 	defer end()

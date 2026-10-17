@@ -460,6 +460,9 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
+		if keepFailedFixture(t) {
+			return
+		}
 		c, end := context.WithTimeout(context.Background(), 5*time.Second)
 		defer end()
 		if e := api.RbacV1().ClusterRoleBindings().Delete(c, binding.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &binding.UID}}); e != nil {
@@ -657,6 +660,9 @@ func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kuberne
 			t.Fatal("shipped CRD create", file, err)
 		}
 		t.Cleanup(func() {
+			if keepFailedFixture(t) {
+				return
+			}
 			c, end := context.WithTimeout(context.Background(), 10*time.Second)
 			defer end()
 			_ = client.Delete().AbsPath("/apis/apiextensions.k8s.io/v1/customresourcedefinitions/" + crd.Metadata.Name).Do(c).Error()

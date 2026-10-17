@@ -11,6 +11,7 @@ import argparse
 import json
 import hashlib
 import os
+import re
 import shutil
 from pathlib import Path
 import subprocess
@@ -234,7 +235,7 @@ def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False,
     return "14m" if runtime_provider_owner else ("12m" if helm_bootstrap else None)
 
 
-def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False):
+def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False):
     if helm_cluster and (helm_bootstrap or test_pattern is not None):
         raise ValueError("--helm-cluster owns its registry/chart infrastructure and exact test selection")
     # ADR-193 step 6: the Helm registry/chart infrastructure, another test.
@@ -492,6 +493,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
 
             if build_scratch is not None:
                 env["TMPDIR"] = str(build_scratch)
+            if keep_on_failure:
+                env["ASSERVAT_KEEP_ON_FAILURE"] = "1"
 
             command = ["go", "test", "-race", "-count=1", "-v"]
             if test_pattern:
@@ -587,40 +590,56 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     report["providerLogExit"] = provider.returncode
                 except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError, KeyError, IndexError, AssertionError) as exc:
                     report["providerLogFailure"] = type(exc).__name__
-            for name in reversed(clusters):
-                try: run(["kind", "delete", "cluster", "--name", name])
-                except Exception: failures.append(name)
-            for name in reversed(containers):
-                try:
-                    info = json.loads(run(["docker", "inspect", name]))[0]
-                    assert info["Config"]["Labels"]["asservat.test"] == run_id
-                    run(["docker", "rm", "-f", "-v", name])
-                except Exception: failures.append(name)
-            for name in reversed(ephemeral_volumes):
-                try:
-                    info = json.loads(run(["docker", "volume", "inspect", name]))[0]
-                    assert info["Labels"]["asservat.test"] == run_id
-                    run(["docker", "volume", "rm", name])
-                except Exception: failures.append(name)
-            if worker_tag:
-                try:
-                    info = json.loads(run(["docker", "image", "inspect", worker_tag]))[0]
-                    assert info["Config"]["Labels"]["asservat.test"] == run_id
-                    run(["docker", "image", "rm", worker_tag])
-                except Exception: failures.append(worker_tag)
-            if created_network:
-                try: run(["docker", "network", "rm", network])
-                except Exception: failures.append(network)
-            if created_kind_network:
-                try:
-                    info = json.loads(run(["docker", "network", "inspect", kind_network]))[0]
-                    assert info["Labels"]["asservat.test"] == run_id
-                    run(["docker", "network", "rm", kind_network])
-                except Exception: failures.append(kind_network)
-                os.environ.pop("KIND_EXPERIMENTAL_DOCKER_NETWORK", None)
-            if helm_bootstrap:
-                try: report["registryCleanup"] = verify_registry_cleanup(run, work, network)
-                except Exception: failures.append(network+"-registry-cleanup-verification")
+            # --keep-on-failure (local debugging only): leave this run's own
+            # clusters and labelled containers for inspection and record them;
+            # --cleanup-kept removes exactly these later with its own evidence.
+            keep = keep_on_failure and exit_code != 0 and bool(clusters)
+            if keep:
+                kept = {"runId": run_id, "clusters": clusters, "containers": containers, "volumes": ephemeral_volumes, "image": worker_tag,
+                        "networks": [n for n, made in ((network, created_network), (kind_network, created_kind_network)) if made]}
+                (cache/"kept").mkdir(exist_ok=True)
+                manifest = cache/"kept"/(run_id+".json")
+                manifest.write_text(json.dumps(kept, indent=2)+"\n")
+                report["keptResources"] = str(manifest)
+                print("Kept failed fixture for inspection:", manifest, flush=True)
+                for name in clusters:
+                    print("  kubeconfig: kind get kubeconfig --name", name, flush=True)
+                print("  remove with: python3 scripts/test-context-storage.py --cleanup-kept", manifest, flush=True)
+            else:
+                for name in reversed(clusters):
+                    try: run(["kind", "delete", "cluster", "--name", name])
+                    except Exception: failures.append(name)
+                for name in reversed(containers):
+                    try:
+                        info = json.loads(run(["docker", "inspect", name]))[0]
+                        assert info["Config"]["Labels"]["asservat.test"] == run_id
+                        run(["docker", "rm", "-f", "-v", name])
+                    except Exception: failures.append(name)
+                for name in reversed(ephemeral_volumes):
+                    try:
+                        info = json.loads(run(["docker", "volume", "inspect", name]))[0]
+                        assert info["Labels"]["asservat.test"] == run_id
+                        run(["docker", "volume", "rm", name])
+                    except Exception: failures.append(name)
+                if worker_tag:
+                    try:
+                        info = json.loads(run(["docker", "image", "inspect", worker_tag]))[0]
+                        assert info["Config"]["Labels"]["asservat.test"] == run_id
+                        run(["docker", "image", "rm", worker_tag])
+                    except Exception: failures.append(worker_tag)
+                if created_network:
+                    try: run(["docker", "network", "rm", network])
+                    except Exception: failures.append(network)
+                if created_kind_network:
+                    try:
+                        info = json.loads(run(["docker", "network", "inspect", kind_network]))[0]
+                        assert info["Labels"]["asservat.test"] == run_id
+                        run(["docker", "network", "rm", kind_network])
+                    except Exception: failures.append(kind_network)
+                    os.environ.pop("KIND_EXPERIMENTAL_DOCKER_NETWORK", None)
+                if helm_bootstrap:
+                    try: report["registryCleanup"] = verify_registry_cleanup(run, work, network)
+                    except Exception: failures.append(network+"-registry-cleanup-verification")
             if build_scratch is not None:
                 try:
                     shutil.rmtree(build_scratch)
@@ -639,6 +658,38 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         return exit_code
 
 
+def cleanup_kept(path):
+    """Remove one --keep-on-failure run's own recorded resources, checking each
+    name or label against that run, and write cleanup evidence."""
+    kept = json.loads(Path(path).read_text())
+    run_id = kept["runId"]
+    if not re.fullmatch(r"[a-z0-9-]{4,64}", run_id):
+        raise ValueError("invalid kept run id")
+    failures = []
+    for name in reversed(kept["clusters"]):
+        try:
+            info = json.loads(run(["docker", "inspect", name+"-control-plane"]))[0]
+            assert run_id in name and info["Config"]["Labels"]["io.x-k8s.kind.cluster"] == name
+            run(["kind", "delete", "cluster", "--name", name])
+        except Exception: failures.append(name)
+    for kind, names in (("container", reversed(kept["containers"])), ("volume", kept["volumes"]), ("image", [kept["image"]] if kept["image"] else []), ("network", kept["networks"])):
+        for name in names:
+            try:
+                info = json.loads(run(["docker", kind, "inspect", name]))[0]
+                labels = info["Config"]["Labels"] if kind in ("container", "image") else info["Labels"]
+                assert labels["asservat.test"] == run_id
+                run(["docker", kind, "rm", "-f", "-v", name] if kind == "container" else ["docker", kind, "rm", name])
+            except Exception: failures.append(name)
+    report = {"runId": run_id, "manifest": str(path), "cleanupFailures": failures}
+    (ROOT/"test/results"/("kept-cleanup-"+run_id+".json")).write_text(json.dumps(report, indent=2)+"\n")
+    if failures:
+        print("Kept fixture cleanup failed for:", ", ".join(failures), flush=True)
+        return 1
+    Path(path).unlink()
+    print("Kept fixture removed:", run_id, flush=True)
+    return 0
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--run", dest="test_pattern", help="Optional Go test pattern; recorded in the report. Default runs the full suite.")
@@ -653,8 +704,12 @@ if __name__ == "__main__":
     parser.add_argument("--runtime-provider-pair", action="store_true", help="Continue the original fresh bootstrap chain through selected worker2/owner2 resources and real provider/SQL worker inputs; requires --initial-bootstrap-chain.")
     parser.add_argument("--runtime-provider-owner", action="store_true", help="Continue the original running worker through owner roles, projection and actual in-Pod paired identity; requires --initial-bootstrap-chain --runtime-provider-pair --runtime-provider-worker.")
     parser.add_argument("--installer-continuation", action="store_true", help="ADR-183: after the original bootstrap chain, run the actual installer-continue Pod and the actual applier through worker and owner launch; requires --initial-bootstrap-chain --runtime-provider-pair.")
+    parser.add_argument("--keep-on-failure", action="store_true", help="Local debugging: on failure keep this run's own clusters and labelled containers, record them, and skip the Go fixtures' own cleanup. Remove them with --cleanup-kept.")
+    parser.add_argument("--cleanup-kept", metavar="MANIFEST", help="Remove one kept run's recorded resources after checking each belongs to that run; writes test/results/kept-cleanup-<run>.json.")
     parser.add_argument("--runtime-provider-worker", action="store_true", help="Continue the original provider pair through actual launch and in-Pod accepted owner observation; requires --initial-bootstrap-chain --runtime-provider-pair.")
     args = parser.parse_args()
+    if args.cleanup_kept:
+        raise SystemExit(cleanup_kept(args.cleanup_kept))
     if (args.initial_handover or args.initial_schema_handover or args.initial_bootstrap_chain) and args.test_pattern is not None:
         parser.error("Installation qualification cannot be combined with --run")
     if sum((args.initial_handover, args.initial_schema_handover, args.initial_bootstrap_chain)) > 1:
@@ -662,4 +717,4 @@ if __name__ == "__main__":
     if args.test_pattern is not None and not 1 <= len(args.test_pattern) <= 256:
         parser.error("--run must contain 1 to 256 characters")
     (ROOT/"test/results").mkdir(parents=True, exist_ok=True)
-    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner, installer_continuation=args.installer_continuation, helm_cluster=args.helm_cluster))
+    raise SystemExit(main(args.test_pattern, initial_handover=args.initial_handover, initial_schema_handover=args.initial_schema_handover, initial_bootstrap_chain=args.initial_bootstrap_chain, helm_bootstrap=args.helm_bootstrap, regional_context_start=args.regional_context_start, runtime_object_roundtrip=args.runtime_object_roundtrip, owner_provider_auth=args.owner_provider_auth, runtime_provider_pair=args.runtime_provider_pair, runtime_provider_worker=args.runtime_provider_worker, runtime_provider_owner=args.runtime_provider_owner, installer_continuation=args.installer_continuation, helm_cluster=args.helm_cluster, keep_on_failure=args.keep_on_failure))

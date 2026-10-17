@@ -261,7 +261,7 @@ func TestDirectHolderObservationWithRealKubernetes(t *testing.T) {
 	r.waitPodRunning(t, ctx, "regional")
 	r.waitControl(t, ctx, "regional")
 	t.Logf("native direct setup elapsed=%s source-refreshes=%d synthetic-initial-roots=true installed-runtime=false full-HWORK-background=false", time.Since(setup), sql.refreshes.Load())
-	modes := []value.ClusterObservationPurpose{value.ObserveCapacityNamespaces, value.ObserveCapacityWorkloads, value.ObserveCapacityWorkload, value.ObserveCapacityNamespaceGuard}
+	modes := []value.ClusterObservationPurpose{value.ObserveCapacityNamespaces, value.ObserveCapacityWorkloads, value.ObserveCapacityWorkload, value.ObserveCapacityNamespaceGuard, value.ObserveCapacityGuardedWorkload}
 	// No new clients, token buckets or SQL pools between these independent
 	// operations. Standby setup belongs to its own original socket interval.
 	for _, purpose := range modes {
@@ -285,7 +285,7 @@ func TestDirectHolderObservationWithRealKubernetes(t *testing.T) {
 			case value.ObserveCapacityWorkloads:
 				request.Namespace = r.plan.ControlNamespace
 				request.Kind = "Deployment"
-			case value.ObserveCapacityWorkload:
+			case value.ObserveCapacityWorkload, value.ObserveCapacityGuardedWorkload:
 				request.Namespace = r.plan.ControlNamespace
 				request.Workload = cfg.WorkloadRef{Kind: "Deployment", Name: "regional", UID: string(r.deployments["regional"].UID)}
 				request.Keys = []string{"native-team"}
@@ -328,6 +328,12 @@ func TestDirectHolderObservationWithRealKubernetes(t *testing.T) {
 				if result.Result.Workload.Labels["native-team"] != "test" {
 					t.Fatal("native selected original label missing")
 				}
+			case value.ObserveCapacityGuardedWorkload:
+				// ADR-197: the guard and the workload in one exchange, as the
+				// regional enrollment consumes them.
+				if result.Result.Workload.Labels["native-team"] != "test" || !slices.Equal(result.Result.Guard.Keys, []string{"native-team"}) {
+					t.Fatal("native combined guard and workload missing")
+				}
 			case value.ObserveCapacityNamespaceGuard:
 				if !slices.Equal(result.Result.Guard.Keys, []string{"native-team"}) {
 					t.Fatal("native exact protected keys changed")
@@ -346,74 +352,6 @@ func TestDirectHolderObservationWithRealKubernetes(t *testing.T) {
 			if err != nil || !closed.OK {
 				t.Fatal("native joined close", err, closed.Category)
 			}
-		})
-		if t.Failed() {
-			return
-		}
-	}
-	// ADR-197 spike: one capacity source window runs a guard observation and
-	// then a workload observation. The first standby is open before the
-	// window; the turnover to a second standby is inside it. Each delay is the
-	// injected latency per regional owner read, standing for a hub lifecycle
-	// conversation instead of SQL. Measurement only: no budget is asserted.
-	for _, delay := range []time.Duration{0, 100 * time.Millisecond, 250 * time.Millisecond} {
-		t.Run("adr197-guard-then-workload-"+delay.String(), func(t *testing.T) {
-			regional := func(q ControlRequest) {
-				t.Helper()
-				call, stop := context.WithTimeout(ctx, 5*time.Second)
-				out, err := r.control(call, "regional", q)
-				stop()
-				if err != nil || !out.OK {
-					t.Fatal("spike regional control", q.Command, err, out.Category)
-				}
-			}
-			regional(ControlRequest{Command: "owner-read-delay", DelayNanos: int64(delay)})
-			defer regional(ControlRequest{Command: "owner-read-delay"})
-			// The regional stream's terminal join reports a failed observation as
-			// unavailable; the spike records it and still closes the stream.
-			release := func() string {
-				call, stop := context.WithTimeout(ctx, 5*time.Second)
-				joined, err := r.control(call, "regional", ControlRequest{Command: "join"})
-				stop()
-				category := "joined"
-				if err != nil || !joined.OK {
-					category = "join-" + joined.Category
-				}
-				a.waitAvailable(t, ctx, false)
-				regional(ControlRequest{Command: "close"})
-				return category
-			}
-			open := func() time.Duration {
-				started := time.Now()
-				regional(ControlRequest{Command: "open", ExchangeID: custodyID()})
-				a.waitAvailable(t, ctx, true)
-				return time.Since(started)
-			}
-			first := open()
-			window := time.Now()
-			notAfter := window.UTC().Add(5 * time.Second)
-			observe := func(purpose value.ClusterObservationPurpose) (time.Duration, bool, string) {
-				started := time.Now()
-				request := value.ClusterObservationRequest{ID: custodyID(), Challenge: custodyID(), RootID: root, ClusterID: r.id, Purpose: purpose, RequestedAt: started.UTC(), NotAfter: notAfter}
-				if purpose == value.ObserveCapacityWorkload {
-					request.Namespace = r.plan.ControlNamespace
-					request.Workload = cfg.WorkloadRef{Kind: "Deployment", Name: "regional", UID: string(r.deployments["regional"].UID)}
-					request.Keys = []string{"native-team"}
-				}
-				call, stop := context.WithDeadline(ctx, notAfter)
-				result, err := a.control(call, "hwork", ControlRequest{Command: "observe", Request: request})
-				stop()
-				return time.Since(started), err == nil && result.OK, result.Category
-			}
-			guard, guardOK, guardCategory := observe(value.ObserveCapacityNamespaceGuard)
-			t.Logf("adr197 spike delay=%s first-open=%s guard=%s ok=%t category=%s", delay, first.Round(time.Millisecond), guard.Round(time.Millisecond), guardOK, guardCategory)
-			guardJoin := release()
-			turnover := open()
-			workload, workloadOK, workloadCategory := observe(value.ObserveCapacityWorkload)
-			total := time.Since(window)
-			workloadJoin := release()
-			t.Logf("adr197 spike delay=%s guard=%s ok=%t category=%s %s turnover=%s workload=%s ok=%t category=%s %s window=%s fits=%t",
-				delay, guard.Round(time.Millisecond), guardOK, guardCategory, guardJoin, turnover.Round(time.Millisecond), workload.Round(time.Millisecond), workloadOK, workloadCategory, workloadJoin, total.Round(time.Millisecond), guardOK && workloadOK && total < 5*time.Second)
 		})
 		if t.Failed() {
 			return

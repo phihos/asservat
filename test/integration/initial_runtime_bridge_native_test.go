@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -375,7 +376,17 @@ func initialRuntimeNativeSource(t *testing.T, ctx context.Context, api kubernete
 	return source
 }
 
+// keepFailedFixture leaves a failed native fixture's objects in place for
+// inspection when the harness runs with --keep-on-failure; the harness's
+// --cleanup-kept removes the owned clusters and containers afterwards.
+func keepFailedFixture(t *testing.T) bool {
+	return t.Failed() && os.Getenv("ASSERVAT_KEEP_ON_FAILURE") == "1"
+}
+
 func initialRuntimeNativeCleanup(t *testing.T, api kubernetes.Interface, namespace, installation, prefix string) {
+	if keepFailedFixture(t) {
+		return
+	}
 	t.Helper()
 	ctx, end := context.WithTimeout(context.Background(), 15*time.Second)
 	defer end()

@@ -62,7 +62,8 @@ jobs:
           go-architecture-check manifest-schema-check investigation-schema-check permission-schema-check
           policy-schema-check permission-crd-check control-schema-check start-crd-check retention-crd-check
           capacity-crd-check helm-check
-      - run: python3 scripts/test-go-shards.py
+      - name: Harness and gate self-tests
+        run: for f in scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-direct-helper-regression.py; do python3 "$f"; done
 
   go:
     needs: changes
