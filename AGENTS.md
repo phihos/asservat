@@ -43,7 +43,7 @@ ADR-096 adds migration 00031's database-incarnation fence. All SQL trust reads/l
 
 The maintainer subsequently requested one-shot completion of the remaining work without stopping at component handoffs. Continue through the existing implementation slices; track active work and verification in docs/implementation-progress.md. This expands implementation authorization, not permission to weaken invariants, claim unrun qualifications, use paid resources or publish releases.
 
-Read `README.md`, the relevant files in `specs/`, `docs/decisions/README.md`, and `docs/implementation-plan.md` before changing behavior. The maintainer's continuation after the feasibility phases authorized the persistent artifact contract and initial S-01/S-02 implementation. Product component foundations now exist; the complete investigation platform is not implemented. Do not enable collection for users before the slice's authority, custody and privacy requirements pass.
+Read `README.md`, `docs/project-guide.md`, the relevant files in `specs/`, `docs/decisions/README.md`, and `docs/implementation-plan.md` before changing behavior. The maintainer's continuation after the feasibility phases authorized the persistent artifact contract and initial S-01/S-02 implementation. Product component foundations now exist; the complete investigation platform is not implemented. Do not enable collection for users before the slice's authority, custody and privacy requirements pass.
 
 ## Authority and invariants
 

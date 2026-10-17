@@ -52,11 +52,23 @@ These investigations require maintainers to approve paid cloud/GPU resources bef
 
 The `go-check` gate runs every non-Kubernetes package once and discovers the
 Kubernetes package's complete top-level test, fuzz-seed and example inventory.
-It runs sequential groups of at most eighty whole parents, retaining subtests,
+It runs sequential groups of at most forty whole parents, retaining subtests,
 `-race`, `-count=1` and the original fifteen-minute aggregate limit for each group.
 Actual run/terminal events must cover the selected names exactly once. Existing
 skips are reported; omitted or duplicate execution fails. This avoids an aggregate
 timeout as the package grows, without extending any runtime authority deadline.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the same gate on every push as
+eight jobs: `check-go-tests.py --shard 0/8` runs every non-Kubernetes package,
+shards 1–7 a deterministic, duration-balanced partition of the discovered
+Kubernetes inventory (`scripts/go-test-durations.json`; unknown tests weigh five
+seconds). Each shard keeps the flags, groups and exact event checks above; the
+partition is unit-tested to cover the inventory exactly once. The documentation,
+schema, SQL, Helm and console gates run as parallel jobs. Native suites run only
+on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`), each on a
+fresh runner; their `test/results` output is uploaded as a run artifact. A CI run
+is recorded like a local run: run URL, exit, selected tests and the harness's
+source hashes.
 
 S-01/S-02 qualification includes the actual installed constructor and every
 nested authority/provider read on its successful path. Passing isolated

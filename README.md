@@ -1,144 +1,165 @@
 # Asservat
 
-See [product implementation status](docs/implementation-status.md) for the current
-feature inventory, verified user outcomes and remaining work. Component tests and
-design documents do not establish a completed installed debugging platform.
+**Catch the evidence before the pod restarts.**
 
-[First-installation activation](docs/architecture/initial-installation.md) now composes the protected Kubernetes witness and fleet source with locked SQL eligibility checks and verified encrypted audit. Native component tests pass; production installer provisioning and restart/restore coordination remain pending. [Implementation progress](docs/implementation-progress.md) records the exact qualification scope.
+When a Kubernetes workload misbehaves, Asservat captures what you need to debug
+it: packet captures, core dumps, CPU and heap profiles, syscall traces, logs and
+files. It works within limits you set, close to the workload and encrypted from the
+first byte. Developers download native files for their own tools; AI agents query
+the same evidence through MCP under the same permissions.
 
-[The one-use installation witness](docs/architecture/installation-witness.md) now has native Kubernetes qualification. It preserves an irreversible initial-attempt record outside SQL; the runnable installer and restart/restore coordinator remain pending. Implementation has resumed from this component checkpoint; see [implementation progress](docs/implementation-progress.md).
+[![CI](https://github.com/phihos/asservat/actions/workflows/ci.yml/badge.svg)](https://github.com/phihos/asservat/actions/workflows/ci.yml)
 
-[Database recovery fencing](docs/decisions/096-database-incarnation-fence.md) now binds effective authority to the accepted PostgreSQL process/database. A restored enabled flag alone cannot reopen access. Independent initial/restore activation and the complete installer remain pending; qualification is tracked in [implementation progress](docs/implementation-progress.md).
+> [!WARNING]
+> **Early development, not ready for use.** The design is complete and many
+> components pass tests against real Kubernetes, PostgreSQL, OpenBao and S3. The
+> end-to-end investigation workflow is unfinished, and no collection is enabled
+> for users. See [implementation status](docs/implementation-status.md).
 
-[Protected configuration reconciliation](docs/architecture/configuration-reconciliation.md) now runs the actual private `hub-worker` executable in a Restricted Pod with [native projected credentials](docs/decisions/094-native-hub-worker-projections.md). The owned native case verifies audited observation, source/Lease loss and [normal foreground deletion](docs/decisions/095-hub-workload-garbage-collection.md). It cannot clear recovery. Full-suite results and limits are in [implementation progress](docs/implementation-progress.md); production provisioning, independent initial/restore activation and public investigation routes remain pending.
+![Asservat overview: open cases, recording health and captures in progress](design/ui/previews/workspace.png)
+<sub>Design prototype with synthetic data.</sub>
 
-[Protected owner deployment](docs/architecture/owner-deployment.md) now loads fixed installation projections, scoped provider credentials and rotating tokens through the private `hub-api` entry point. Automatic provisioning, source/recovery reconciliation and native in-Pod deployment remain pending; public investigation routes are not enabled.
+## Why Asservat
 
-[Multi-cluster worker routing](docs/architecture/worker-routing.md) now selects each worker's stored profile and exact issuer trust, with separate profile-scoped effect permissions. Protected installation synchronization and native deployment qualification remain pending.
+By the time someone is paged, the container has restarted, the packets are gone
+and the memory spike has passed. "Can you reproduce it?" is the usual next step.
+Asservat records what happened while it happens.
 
-[Owner startup composition](docs/architecture/owner-startup.md) now joins credential renewal, private receiving, live forwarding and expiring readiness without a Kubernetes Ready dependency cycle. The protected loader and entry point are described above; native in-Pod qualification remains pending.
+- **Capture on trigger, not on request.** Point a policy at a Deployment or
+  StatefulSet. Log patterns, resource thresholds, probe failures, crashes and
+  external alerts start bounded evidence recipes on the affected pod.
+- **The evidence you actually need.** Logs, files and `/proc`, packet captures
+  with pcap filters and Kubernetes-aware peers, HTTP headers, pprof-style runtime
+  profiles, core dumps, syscall traces and custom commands. Reusable capture
+  profiles combine them.
+- **Your tools, native files.** PCAPNG for Wireshark, cores with their companion
+  files for your debugger, profiles for pprof. No proprietary viewer in the way.
+- **Made for AI agents.** A typed MCP interface lets your coding agent find cases,
+  summarize crashes and profiles, query packets and request new captures, with
+  your permissions. Asservat embeds no LLM.
+- **Watch live, keep the last 30 seconds.** Packet and syscall recorders run
+  continuously within limits. Watch approved projections and save a window before
+  it rotates away.
+- **Permissions you already have.** Reuse namespace metadata, RBAC and even
+  pod-exec rights. Manage bindings as CRDs, through `kubectl` or GitOps.
+- **Safe in production.** Per-workload quotas and capture-storm protection,
+  approval for intrusive actions, expiring policy grants, encryption on the node,
+  administrator-enforced retention, and workloads stay at Pod Security `restricted`.
+- **One hub, many clusters, no call-home.** Central management for your
+  organization, installed with Helm. No telemetry, no SaaS, no licence keys.
 
-[Live owner delivery](docs/architecture/owner-forwarding.md) now keeps the original enrollment operation connected through the final worker response, with bounded cancellation and no protocol replay. Protected startup, native routing and evidence transfer remain pending; [implementation progress](docs/implementation-progress.md) records actual verification.
+## How it works
 
-[Outbound owner transfer](docs/architecture/owner-forwarding.md) now verifies the exact current hub and locator before sending a Pod token, rejects replay/redirects and validates the returned worker certificate. Protected startup and native routing remain pending; [implementation progress](docs/implementation-progress.md) records measured scope.
+```mermaid
+flowchart LR
+    T["Pod misbehaves<br/>panic · OOM · probe failure · alert"] --> D["Detector fires<br/>near the workload"]
+    D --> C["Bounded capture<br/>pcap · core · profile · syscalls · logs"]
+    C --> E["Encrypted on the node<br/>stored in the region"]
+    E --> H["Hub<br/>catalog · approvals · audit"]
+    H --> U["Console"]
+    H --> N["Native download<br/>Wireshark · debugger · pprof"]
+    H --> M["MCP<br/>for AI agents"]
+```
 
-[The private owner receiver](docs/architecture/owner-relay.md) now connects current hub identity and exact live request ownership to bounded mutual-TLS HTTP handling. Outbound forwarding and protected in-Pod startup remain pending; verification is recorded in [implementation progress](docs/implementation-progress.md).
+A policy can be this small. The `workload-failure` preset supplies the detectors,
+recipe, limits and retention:
 
-[Process-owned hub credentials](docs/architecture/owner-credentials.md) now add separate server/client keys, audited enrollment verification, finite renewal and shutdown. Protected startup and private forwarding remain pending; actual qualification is tracked in [implementation progress](docs/implementation-progress.md).
+```yaml
+apiVersion: asservat.io/v1alpha1
+kind: DebugPolicy
+metadata:
+  name: api-failures
+  namespace: payments
+spec:
+  presetRef:
+    name: workload-failure
+    version: v1
+  target:
+    workloadRef:
+      kind: Deployment
+      name: api
+  logPattern:
+    match: literal
+    value: 'panic:'
+```
 
-[Current hub peer authentication](docs/architecture/owner-authentication.md) now combines actual TLS, durable registration, workload protection and Ready routing. Native proof-to-activation integration and its remaining bootstrap/transport boundaries are tracked in [implementation progress](docs/implementation-progress.md).
+Need more control? [Combine detectors and capture profiles](examples/policy-composed.yaml)
+or browse [all examples](examples/README.md).
 
-[Durable hub owner enrollment](docs/architecture/owner-registration.md) now adds registration, bounded signing spend, encrypted audit and separate certificate activation/current registry. Verification and remaining runtime composition are tracked in [implementation progress](docs/implementation-progress.md).
+## Architecture
 
-[Hub owner enrollment proof](docs/architecture/owner-enrollment-proof.md) now verifies the current Pod token, workload membership and CSR before readiness. Its durable lifecycle is specified in [owner registration](docs/architecture/owner-registration.md); measured scope is in [implementation progress](docs/implementation-progress.md).
+```mermaid
+flowchart LR
+    User["Developer · AI agent"] -->|OIDC| Hub
+    subgraph HubCluster["Management cluster"]
+        direction TB
+        Hub["Hub API<br/>console · MCP"]
+        Worker["Hub worker"]
+        DB[("PostgreSQL<br/>catalog · state")]
+        Audit[("Object store<br/>encrypted audit")]
+        Hub --- DB
+        Worker --- DB
+        Hub --- Audit
+    end
+    subgraph Region["Each workload cluster"]
+        direction TB
+        Conn["Connector"]
+        Node["Node collectors"]
+        Store[("Evidence store<br/>encrypted")]
+        Keys["Key service"]
+        Conn --> Node
+        Node --> Store
+        Node -->|wrap only| Keys
+    end
+    Hub ---|"mTLS, dialed out by the connector"| Conn
+```
 
-The [private hub workload protection](docs/architecture/owner-workload-protection.md) now adds native namespace admission and independent enforcement proof. Owner enrollment and protected installation composition remain pending; see [implementation progress](docs/implementation-progress.md) for measured scope.
+Raw evidence, keys and analysis stay in the workload's region; the hub keeps the
+catalog, approvals and encrypted audit. Connectors dial out, so the hub never holds
+cluster kubeconfigs. Details: [architecture](docs/architecture.md) and
+[security model](docs/security.md).
 
-Asservat is a proposed Kubernetes debugging platform that preserves evidence when a workload behaves suspiciously and makes that evidence available to developers and their AI agents through controlled MCP queries and authenticated native-file downloads for local tools.
+## A look at the console
 
-The pod is the unit of configuration, permission and collection; container/process identity is retained internally for provenance. Monitor all authorized replicas within administrator limits and bound collection separately.
+<table>
+  <tr>
+    <td width="50%"><img src="design/ui/previews/capture-review.png" alt="Capture review with impact, user-data and retention notes"><br><b>Review before collecting.</b> Impact, possible user data, retention and who can read the result, with one approval for collection and access.</td>
+    <td width="50%"><img src="design/ui/previews/evidence.png" alt="Network evidence with peers, HTTP fields and coverage gaps"><br><b>Evidence with honest coverage.</b> Kubernetes-aware peers, allowlisted HTTP fields and explicit gaps.</td>
+  </tr>
+  <tr>
+    <td width="50%"><img src="design/ui/previews/live-watch.png" alt="Live watch of HTTP headers from a recording pod"><br><b>Watch live.</b> Approved projections of an ongoing recording; save the last 30 seconds in one click.</td>
+    <td width="50%"><img src="design/ui/previews/download-packets.png" alt="Native PCAPNG download for Wireshark"><br><b>Download native files.</b> PCAPNG, cores and profiles for your local tools.</td>
+  </tr>
+</table>
 
-Point a policy at a Deployment, StatefulSet, or selected pods. Combine log patterns, resource thresholds, probe failures, crashes, and external alerts with bounded evidence recipes: logs, container files and `/proc`, packet captures, pprof and similar runtime profiles, core dumps, bounded syscall traces, and custom commands. Versioned capture profiles let users compose and adapt these collectors. Collection and analysis run close to the workload; one central service manages multiple clusters, cases, approvals, and sharing.
+<sub>Design prototype with synthetic data. The [full prototype](docs/ux/README.md) has 63 screens.</sub>
 
-**Status: reviewed design with Go authority, browser sessions, encrypted pod-context, SQL publication and native-download components; no complete investigation service is implemented or deployed.** Work recorded on 2026-10-09 includes Gadget capture in a disposable Kubernetes VM, encrypted object-storage/native downloads, PostgreSQL concurrency tests and a disposable-VM core helper with local debugger verification. These establish limited mechanism behavior, not production support; broader integration and performance investigations remain release gates. The [artifact foundation](docs/research/artifact-foundation.md), [custody continuation](docs/research/custody-foundation.md) and [full-manifest verification](docs/research/manifest-foundation.md) record implemented packages and their limits; [ADR-048 storage format](docs/architecture/artifact-format.md) fixes the implementation contract. Context verification leaves artifacts unpublished; production authority composition and the user workflow remain pending.
+## Status
 
-The [identity continuation](docs/research/identity-foundation.md) adds a bounded access-token adapter and ordinary permission evaluator, including current organization/client policy, deny precedence and retained audiences. Its HTTPS/JWT tests use synthetic policy projections. The [Keycloak reference profile](docs/architecture/keycloak-profile.md) and [browser-session flow](docs/architecture/browser-sessions.md) now pass real token/PKCE/refresh, encrypted session and provider logout qualification; operator realm acceptance and end-to-end execution/publication composition remain required before collection or disclosure is enabled. Subsequent protected readers, explicit-binding reconciliation and encrypted intent audit are recorded in [implementation progress](docs/implementation-progress.md).
+Asservat is built in vertical slices with every claim backed by recorded test
+runs. Implemented and tested against real services: OIDC sign-in (Keycloak
+reference), Kubernetes permission observation, encrypted pod-context capture and
+publication, audited native downloads, multi-cluster connector enrollment and
+the Helm bootstrap. Packet, core, profile and syscall collectors are designed
+but not yet built.
 
-[Team automation](docs/architecture/policy-automation.md) now has protected administrator envelopes, durable policy acceptance and encrypted audit with current source/delegation checks. Team policies use independent bounded authority without retaining a developer's offline SSO credentials. [Browser settings](docs/decisions/061-current-browser-configuration.md) now have current Kubernetes-to-SQL observation, administrator lifetime ceilings and outage-safe logout. Production signed submissions, protected bootstrap and execution composition remain pending; the [progress record](docs/implementation-progress.md) distinguishes measured component tests from unfinished runtime work.
+The next milestone is a complete installed investigation across two clusters.
+Track it in [implementation status](docs/implementation-status.md) and
+[implementation progress](docs/implementation-progress.md).
 
-The [permission observation continuation](docs/research/permission-foundation.md) adds concrete Kubernetes binding/source readers and selected namespace metadata, with real API/RBAC tests. Observed configuration and mapping proposals do not grant access: the [acceptance continuation](docs/research/permission-acceptance-foundation.md) adds SQL assignment history, encrypted authority audit and structural CRD/native admission components; protected source qualification and end-to-end authority wiring remain pending. Ordinary eligibility now separately enforces the specified five-second deny freshness limit.
+## Learn more
 
-The [local start journal](docs/architecture/local-start.md) now consumes exact prepaid attempts through Kubernetes CAS; real API tests cover duplicates, restart and role separation. [Peer identity](docs/architecture/peer-identity.md) adds real TLS verification, protected signing-key reads and current SQL connector registration checks. The [enrollment coordinator](docs/architecture/enrollment-activation.md) now composes bounded PKI signing, encrypted claim/certificate audit and atomic activation with real-provider tests. [Fleet administration](docs/architecture/fleet-administration.md) and the [credential channel](docs/architecture/bootstrap-channel.md) are also implemented components. [Audited administrator issuance](docs/architecture/bootstrap-issuance.md) also passes composed provider tests. Protected trust/recovery and public collection remain incomplete.
+- [Product definition](docs/product.md): users, workflows, requirements and boundaries
+- [Behavior specifications](specs/README.md): normative behavior and acceptance scenarios
+- [MCP workflows](docs/interfaces/mcp-workflows.md): what an agent can do, tool by tool
+- [Security model](docs/security.md): threats, grants, sharing, isolation and privacy
+- [Helm installation](docs/installation/helm.md): the official installation method and its current scope
+- [Decision records](docs/decisions/README.md): every accepted design decision
+- [Project guide](docs/project-guide.md): full reading map, component notes and validation commands
 
-## Start here
+## Development
 
-**Official installation method: Helm.** The [chart](charts/asservat/README.md) installs the configuration foundation and includes an optional initial database/bootstrap hook with a passing packaged real-service test. The [progress record](docs/implementation-progress.md) retains the earlier unexplained hook failure and exact test scope. See the [installation guide](docs/installation/helm.md) for commands, scope and upgrade behavior. Runnable platform services are still in progress; this development chart does not deploy a working debugging service. Keycloak is the first tested external identity provider. [Accepted small-deployment alternatives](docs/research/small-deployments.md) add local users/login, static-key services, bundled PostgreSQL and an evidence-store option; these are not implemented chart features yet.
-
-The first [local wrapping/signing backends](docs/architecture/local-keys.md), provider-neutral credential encryption and [private mTLS key-service components](docs/architecture/local-key-service.md) are implemented. [Protected key lifecycle](docs/architecture/local-key-lifecycle.md) now supplies immutable Secret reads and durable additive-rotation checks. Remaining current-authority providers, source enrollment/issuer/retirement, local login and bundled-service installation remain pending.
-
-The initial [download key resolver](docs/architecture/download-key-authority.md) now checks an audited SQL download batch and its exact acquisition certificate before local unwrap. [Current worker proofs](docs/architecture/download-worker-attestation.md) additionally bind that grant to a Kubernetes Pod-bound token and exact live Job/account/spec identities. [Audited dispatch](docs/architecture/download-worker-dispatch.md) now adds the restricted Job driver and durable launch/retirement accounting. [Protected worker configuration](docs/architecture/worker-configuration.md) adds administrator admission proof, separately audited SQL revisions and original freshness deadlines. [Worker credential enrollment](docs/architecture/worker-enrollment.md) now adds Pod/token/CSR proof, independently audited issuance/activation and bounded renewal. [Process-owned worker credentials and a private enrollment channel](docs/architecture/worker-credential-channel.md) now connect the CSR/token exchange to active control requests. The initial [worker startup](docs/architecture/worker-startup.md) now validates typed immutable trust/configuration and supervises the credential phase. [Active request ownership](docs/architecture/worker-request-routing.md) now adds bounded process-local routing and cancellation through certificate delivery. [Shared worker request locators](docs/architecture/worker-owner-locator.md) now provide finite SQL ownership and exact local receiving. [Hub owner discovery](docs/architecture/hub-owner-discovery.md) now supplies bounded Kubernetes endpoint observations and exact TLS Pod/process identity verification. [Protected owner configuration](docs/architecture/owner-configuration.md) now supplies admission-qualified pool/public-root observations and current route composition. [Durable owner acceptance](docs/decisions/078-owner-configuration-acceptance.md) now records monotonic revisions, failure watermarks and independently verified encrypted audit before current recovery-bound reads. [Hub owner certificate issuance](docs/architecture/owner-issuance.md) now supplies purpose-separated OpenBao signing and exact current-root/CSR verification. [Durable owner enrollment](docs/architecture/owner-registration.md) now adds audited registration/activation and bounded history. Protected recovery/workload/issuer bootstrap, private forwarding, connector proof mediation, actual native transfer, local CA and public download workflows remain pending.
-
-| Read | Purpose |
-| --- | --- |
-| [UI mockups and workflows](docs/ux/README.md) | Navigable 63-screen console, desktop/mobile previews and role/failure states |
-| [Web GUI design research](docs/ux/web-design-research.md) | Primary-source findings, minimalist overhaul and validation limits |
-| [Domain model](docs/domain/README.md) | Entities, relationships, invariants and SQL/CRD/Go boundaries |
-| [Outward interfaces](docs/interfaces/README.md) | MCP journeys, browser OpenAPI, configuration, identity and integrations |
-| [Full design review](docs/reviews/design-review.md) | Ranked defects, fixes, remaining risks and document coverage |
-| [Final correctness review](docs/reviews/final-review.md) | Additional boundary defects, applied corrections and accepted feature priorities |
-| [Use-case walkthroughs](docs/reviews/use-case-walkthroughs.md) | Tabletop incident, administrator and agent workflows |
-| [Product definition](docs/product.md) | Scope, users, workflows, requirements and boundaries |
-| [Research findings](docs/research/findings.md) | Claim-by-claim corrections, source evidence, feasibility and unknowns |
-| [Kubeshark comparison](docs/research/kubeshark-comparison.md) | Verified overlap, automation capabilities and the broader evidence scope |
-| [Implementation architecture](docs/architecture/README.md) | Applications, component/module ownership, internal protocols, failure walkthroughs and implementation slices |
-| [Architecture](docs/architecture.md) | Central multi-cluster design, trust boundaries, storage and failure behavior |
-| [PostgreSQL reassessment](specs/changes/postgresql-hub-state/proposal.md) | Accepted change: Kubernetes configuration, PostgreSQL hub state, object-store evidence |
-| [Technology choices](docs/technology.md) | Selected stack, alternatives, dependency licences and no-call-home review |
-| [Small-deployment alternatives](docs/research/small-deployments.md) | Researched internal identity/keys, bundled storage/database, backups, maintenance and migration recommendations |
-| [Build or reuse](docs/architecture/build-or-reuse.md) | All 24 component responsibilities, reusable libraries/tools and integration risks |
-| [Technology experiments](experiments/technology-selection/README.md) | Reproducible synthetic dependency tests, failures and remaining qualification |
-| [Packet and download feasibility](docs/research/feasibility-packet-downloads.md) | Actual VM capture, filter/compiler findings, endpoint-map updates, ring pressure and a 2 GiB encrypted native-download experiment |
-| [SQL and crash-path feasibility](docs/research/feasibility-control-crash.md) | Actual grant/quota races, lost COMMIT reply, expiry defects and bounded native-core handoff with GDB verification |
-| [Specification format](docs/specification-format.md) | Research into agent workflows and the format used here |
-| [Behavior specifications](specs/README.md) | Normative behavior, interfaces and acceptance scenarios |
-| [Ergonomics review](docs/ergonomics-review.md) | Reduced setup effort, preset workflows, approval/sharing journeys and usability gates |
-| [Storm control and quotas](specs/capacity.md) | Workload-wide admission limits, resource fairness and protected storage allocations |
-| [Capture impact and data handling](specs/capture-assessment.md) | Combined workload effects, uncertainty, sensitive contents and automatic-deletion notices |
-| [Live watching](specs/live-watch.md) | Watch approved packet/HTTP and syscall projections through UI and MCP; save before raw inspection |
-| [Save existing recordings](specs/recording-saves.md) | Preserve authorized packet/syscall history without firing dumps or starting another recorder |
-| [Action lifecycles](specs/action-lifecycle.md) | On-trigger actions, continuously armed recorders and bounded incident saves |
-| [Reusable capture profiles](specs/capture-profiles.md) | Shipped/admin catalogs, typed customization and composition into one bounded plan |
-| [Syscall evidence](specs/syscalls.md) | All pod processes, bounded metadata or approved argument traces, and MCP analysis |
-| [Capture history](specs/capture-history.md) | Find past requests for the same selector and restore their settings into a fresh capture |
-| [Guided evidence selection](specs/guidance.md) | Goal-based playbooks, process/traffic discovery, suggested filters and capture sizing |
-| [Packet capture](specs/packets.md) | Pcap filters, live Service/workload peers, bounded rings and HTTP headers |
-| [Hub persistence](specs/persistence.md) | SQL state, transaction boundaries, outbox, durability and restore |
-| [Privacy and retention](specs/privacy.md) | Administrator maxima, user-data handling, copy deletion and GDPR-related controls |
-| [Security model](docs/security.md) | Threats, grants, evidence sharing, isolation and privacy |
-| [Permission automation](specs/permissions.md) | Kubernetes API, GitOps bindings, namespace metadata and inherited exec rights |
-| [Operations](docs/operations.md) | Packaging, sizing, retention, recovery, upgrades and air gaps |
-| [Validation plan](docs/validation.md) | Experiments, acceptance gates and supported-environment criteria |
-| [Implementation plan](docs/implementation-plan.md) | Ordered work packages and review checkpoints |
-| [Decision records](docs/decisions/README.md) | User decisions and proposed architectural decisions |
-| [Examples](examples/README.md) | Concrete policies, capture requests, grants, sharing and evidence contracts |
-
-The [original brief](docs/research/original-brief.md) is preserved verbatim for provenance. Where it conflicts with the current design, the findings and decision records explain the change.
-
-## Confirmed product decisions
-
-- One organization per installation, with central management of multiple clusters from the first release. Teams use workload access controls and explicit evidence sharing.
-- Reviewed, expiring policy grants may authorize automatic intrusive actions; ad hoc intrusive actions require individual approval. [Team policies](specs/policy-automation.md) use bounded administrator delegation and survive creator departure; people still need current rights to manage or inspect evidence. Standard OIDC sessions require no directory-reader service account.
-- PostgreSQL stores transactional hub state and the catalog. Kubernetes remains the configuration/local-control API; object storage holds encrypted evidence and durable audit. No message broker is required.
-- Small installations must have internal users/login, static-key encryption and Helm-provided PostgreSQL alternatives. Dependency providers are independently selectable; bundled evidence storage is planned. Accepted package choices and pending qualification are tracked in [ADR-063](docs/decisions/063-small-deployment-alternatives.md).
-- Evidence may be shared with otherwise ineligible users or groups **within the organization**. Owners may select recipients when requesting a capture, or explicitly authorize bounded recurring-policy sharing. Multiple owner teams can manage shares while the creating actor remains auditable. Sharing does not bypass raw-access controls.
-- Automate permission management through CRDs and the Kubernetes API. Administrators can enable inheritance from protected namespace/workload metadata or existing Kubernetes permissions, including pod exec rights.
-- Low-effort administration and investigation are first-release requirements. Retention maxima are administrator controlled and include derived evidence and managed copies.
-- No embedded LLM or agent harness, third-party telemetry, required SaaS, or writes to ticket/chat/wiki systems.
-- Encrypt evidence on the collection node. Offline analysis requires operator-qualified encrypted scratch storage. Keep workload namespaces at Pod Security `restricted`.
-- Maintainers can save existing packet/syscall recordings under explicitly reviewed policy scope, using normal capture limits, history and sharing.
-
-## Validate this specification
-
-`make spec-check` checks local links, JSON/YAML syntax, schema-backed examples, requirement/scenario/task references, and contract consistency. See [the specification format](docs/specification-format.md) for the development-only validator dependencies. This command is not a runtime or Kubernetes feasibility test.
-
-`make architecture-check` adds component/dependency ownership, internal control-contract examples and synthetic retry/fencing checks. `make design-check` checks the domain, screens and browser/MCP contract mapping. These gates validate the design. `make go-check` and `make go-architecture-check` validate the implemented Go components; `make context-integration` creates owned real-service fixtures for their integration test. None establishes a complete production investigation.
-
-`make custody-integration` creates owned PostgreSQL/S3 fixtures for storage-accounting races and verified version/multipart cleanup. `make sql-tools` installs pinned development tools; `make sql-check` detects generated query drift. Set `TMPDIR` to a filesystem with adequate space when building Go; on this workstation use `/home/phil/.cache/asservat-build/tmp`.
-
-`make database-recovery-integration` upgrades an enabled synthetic legacy root, restarts its owned PostgreSQL container, and restores a logical backup into a new database. Product authority readers must reject each unaccepted incarnation. Independent activation is fixture-only; this does not qualify production disaster recovery.
-
-`make context-integration` also verifies the complete pod-status artifact through Kubernetes, OpenBao, S3 and PostgreSQL in one fixture. `make manifest-schema-check`, included in `go-check`, rejects drift between canonical and embedded schemas. These checks do not provide end-user authority or publish evidence.
-
-`make permission-integration` creates and removes its own Kind cluster for permission observation/RBAC tests. Its permissive test CRDs are not production installation manifests. `make permission-schema-check`, included in `go-check`, validates the reader's embedded schema bundle.
-
-The recorded documentation check is in [spec-validation.txt](docs/research/spec-validation.txt).
-
-Native downloads for every collected artifact and saved derivative are specified in [artifact-downloads.md](specs/artifact-downloads.md). This supersedes the original raw-file export restriction; managed encryption, current access and raw-download grants still apply.
-
-The [review from user outcomes](docs/reviews/user-task-review.md) records additional task blockers, applied contract corrections and outstanding recommendations. [Combined investigation approval](specs/investigation-approval.md) implements the accepted one-review decision in the design; no runtime has been built.
-
-`make fleet-integration` owns PostgreSQL/S3/OpenBao fixtures for credential-channel, enrollment and current TLS-registration tests. It does not create Kubernetes clusters or install collectors.
-
-`make helm-check` validates and packages the official chart without a cluster. `make helm-integration` creates and removes its own Kind cluster to test the chart's configuration install/upgrade/rollback/uninstall lifecycle and preserved custom resources. Neither enables collection.
-
-[Native download sessions](docs/architecture/download-sessions.md) now pass bounded SQL/S3/HTTPS component tests, including current permission fencing, encrypted intent/outcome audit, partial/full file recovery and a checksum-verified synthetic local file. This does not enable public downloads: browser/OAuth ingress, production authority/retention/restore composition and regional relay remain required.
+Go, React/TypeScript and PostgreSQL. `make spec-check architecture-check` validates
+the specification; `make go-check` runs the Go gate; native suites such as
+`make context-integration` create and remove their own kind clusters and services.
+CI runs on every push; see [validation](docs/validation.md) for all gates.
