@@ -337,3 +337,19 @@ regional slot.
     discovery therefore always landed in that gap. After a served standby,
     up to five failed opens now retry at 100 ms each before the one-second
     pacing applies.
+  - [CI run 1](../../test/results/adr197-continuation-ci-1/native-continuation-1/context-storage-environment.json)
+    (GitHub Actions run 39026237800, fresh runner): the quick retries
+    restore most discovery reads, and one guarded-workload observation
+    succeeded, but no enrollment row appeared within five minutes. The
+    reconciler discarded `ReconcileWorkload`'s error; each refusal now
+    names its fixed stage and regional clusters log one line per change.
+  - [CI run 2](../../test/results/adr197-continuation-ci-2/native-continuation-1/context-storage-environment.json)
+    (run 39028306118): every guarded-workload attempt stopped at `claim`,
+    logged as `guarded-read (unavailable)`. Discovery still alternated
+    between success and a refused claim, and the guarded read always
+    follows a successful discovery, so it always met the gap: replacing a
+    served standby (local checks, TLS, Hello, hub authentication) outlasts
+    the 2 s pace plus five quick retries. The region now keeps two
+    standbys open and the hub holder admits three entries (two live, one
+    served entry in joined cleanup), so a ready standby remains while the
+    other is replaced. Request deadlines and claim checks are unchanged.

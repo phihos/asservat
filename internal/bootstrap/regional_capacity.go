@@ -23,7 +23,7 @@ import (
 )
 
 // regionalCapacity serves the hub-worker's ADR-197 v2 capacity observation:
-// one outbound standby at a time to the hub owner's operation port, each
+// regionalStandbys outbound standbys to the hub owner's operation port, each
 // answering at most one combined observation. Its Kubernetes clients are its
 // own instances at the same fixed limits, so it never spends the executor's
 // proof budget (ADR-199).
@@ -159,12 +159,32 @@ func (r *regionalCapacity) run(ctx context.Context, credentials *mtls.ConnectorP
 	if err != nil {
 		return &fixedStepError{"capacity-producer", err}
 	}
-	client, err := mtls.NewConnectorObservationOperationClient(ctx, r.owner, r.c.OperationAddress, r.roots, producer, r.lifecycle, r.lifecycle, regionalTimedMetadata{r.metadata, r.timed}, 1, time.Now)
+	client, err := mtls.NewConnectorObservationOperationClient(ctx, r.owner, r.c.OperationAddress, r.roots, producer, r.lifecycle, r.lifecycle, regionalTimedMetadata{r.metadata, r.timed}, regionalStandbys, time.Now)
 	if err != nil {
 		return &fixedStepError{"capacity-client", err}
 	}
 	defer client.Close()
 	fmt.Fprintln(os.Stderr, "regional capacity standby active")
+	var loops sync.WaitGroup
+	for range regionalStandbys {
+		loops.Add(1)
+		go func() {
+			defer loops.Done()
+			r.standbys(ctx, client)
+		}()
+	}
+	loops.Wait()
+	return nil
+}
+
+// regionalStandbys keeps a second standby open: replacing a served one (local
+// checks, TLS, Hello, hub authentication) takes longer than the hub-worker's
+// pace, so with one standby every second request found none (ADR-197 CI
+// continuation 2). The hub holder admits one more entry for cleanup lag.
+const regionalStandbys = 2
+
+// standbys keeps one of the standbys open until ctx ends.
+func (r *regionalCapacity) standbys(ctx context.Context, client *mtls.ConnectorObservationOperationClient) {
 	last, quick := "", 0
 	for ctx.Err() == nil {
 		// A standby that served or held its full interval is replaced at
@@ -195,10 +215,9 @@ func (r *regionalCapacity) run(ctx context.Context, credentials *mtls.ConnectorP
 			pause = 100 * time.Millisecond
 		}
 		if err != nil && pause > 0 && waitWorker(ctx, pause) != nil {
-			break
+			return
 		}
 	}
-	return nil
 }
 
 func (r *regionalCapacity) standby(ctx context.Context, client *mtls.ConnectorObservationOperationClient) (bool, error) {

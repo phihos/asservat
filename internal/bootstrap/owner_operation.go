@@ -29,6 +29,10 @@ type OwnerOperationConfig struct {
 	Registry *postgres.ConnectorObservationOperationRegistry
 }
 
+// ownerRegionalStandbys admits the region's two standbys (regionalStandbys)
+// plus one served entry still in joined cleanup.
+const ownerRegionalStandbys = 3
+
 // ownerOperationServing is composed once the server identity is active: the
 // claim receiver binds the current serving leaf.
 type ownerOperationServing struct {
@@ -42,7 +46,7 @@ type ownerOperationServing struct {
 func newOwnerOperationServing(root context.Context, c OwnerOperationConfig, server *mtls.OwnerCredentials) (*ownerOperationServing, error) {
 	out := &ownerOperationServing{}
 	var err error
-	if out.holder, err = wire.NewHubObservationOperationHolder(root, 2, time.Now); err != nil {
+	if out.holder, err = wire.NewHubObservationOperationHolder(root, ownerRegionalStandbys, time.Now); err != nil {
 		return nil, err
 	}
 	if out.receiver, err = NewOwnerLocalObservationReceiver(root, c.Pin, server, c.Owners, c.Proof, out.holder, 2, time.Now); err != nil {
@@ -80,7 +84,7 @@ func newOwnerOperationServing(root context.Context, c OwnerOperationConfig, serv
 }
 
 func (o *ownerOperationServing) serve(root context.Context, listener net.Listener) error {
-	return native.ServeOwnerObservationOperation(root, listener, o.roots, o.serving, o.receiver, o.handler, 2, 2)
+	return native.ServeOwnerObservationOperation(root, listener, o.roots, o.serving, o.receiver, o.handler, 2, ownerRegionalStandbys)
 }
 
 func (o *ownerOperationServing) close() {
