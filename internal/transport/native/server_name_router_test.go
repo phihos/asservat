@@ -10,6 +10,7 @@ import (
 	"io"
 	"math/big"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -36,6 +37,9 @@ func TestServerNameRouterSplitsByClientHello(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var mu sync.Mutex
+	events := map[string]bool{}
+	router.Report = func(e string) { mu.Lock(); events[e] = true; mu.Unlock() }
 	done := make(chan error, 1)
 	go func() { done <- router.Run() }()
 	for _, name := range []string{"native.synthetic.invalid", "observation.synthetic.invalid"} {
@@ -78,11 +82,59 @@ func TestServerNameRouterSplitsByClientHello(t *testing.T) {
 		t.Fatal("non-TLS bytes answered")
 	}
 	plain.Close()
+	for until := time.Now().Add(3 * time.Second); ; time.Sleep(20 * time.Millisecond) {
+		mu.Lock()
+		reported := events["unknown-name"] && events["peek-failed"]
+		mu.Unlock()
+		if reported {
+			break
+		}
+		if time.Now().After(until) {
+			t.Fatal("router did not report its drops", events)
+		}
+	}
 	cancel()
 	if <-done == nil {
 		t.Fatal("router ended without cause")
 	}
 	if _, err = router.Listener("native.synthetic.invalid").Accept(); err == nil {
 		t.Fatal("child open after the router ended")
+	}
+}
+
+// A child that accepts late makes the router report a slow hand-off.
+func TestServerNameRouterReportsSlowHandoff(t *testing.T) {
+	raw, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	router, err := NewServerNameRouter(ctx, raw, "observation.synthetic.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reported := make(chan string, 4)
+	router.Report = func(e string) { reported <- e }
+	go func() { _ = router.Run() }()
+	go func() {
+		c, e := tls.Dial("tcp", raw.Addr().String(), &tls.Config{ServerName: "observation.synthetic.invalid", InsecureSkipVerify: true, MinVersion: tls.VersionTLS13})
+		if e == nil {
+			c.Close()
+		}
+	}()
+	time.Sleep(1200 * time.Millisecond)
+	conn, err := router.Listener("observation.synthetic.invalid").Accept()
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn.Close()
+	select {
+	case e := <-reported:
+		if e != "slow-handoff observation.synthetic.invalid" {
+			t.Fatal("event", e)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("slow hand-off not reported")
 	}
 }
