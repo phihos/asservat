@@ -133,20 +133,20 @@ func (m *ClusterObservationMetadata) ObserveCluster(ctx context.Context, request
 		// ADR-197: the guard first, then the workload under exactly its keys.
 		guard, err := m.guard.CapacityNamespaceProtection(call)
 		if err != nil {
-			return zero, err
+			return zero, &observationStep{"guard", err}
 		}
 		if !guard.Valid(m.client.now()) || guard.ClusterID != request.ClusterID || !slices.Equal(guard.Keys, request.Keys) {
-			return zero, cfg.ErrUnavailable
+			return zero, &observationStep{"guard-keys", cfg.ErrUnavailable}
 		}
 		if err = current(); err != nil {
-			return zero, err
+			return zero, &observationStep{"current", err}
 		}
 		value, err := m.client.ReadCapacityWorkload(call, request.Namespace, request.Workload, request.Keys)
 		if err != nil {
-			return zero, err
+			return zero, &observationStep{"workload", err}
 		}
 		if !value.Valid(m.client.now()) || value.Namespace.ClusterID != request.ClusterID {
-			return zero, cfg.ErrUnavailable
+			return zero, &observationStep{"workload-valid", cfg.ErrUnavailable}
 		}
 		out.Guard = &fleet.ClusterNamespaceGuardObservation{Digest: guard.Digest, Keys: slices.Clone(guard.Keys), Interval: fleet.ClusterObservationInterval{ObservedAt: guard.ObservedAt, FreshUntil: guard.FreshUntil}}
 		out.Workload = &fleet.ClusterExactWorkloadObservation{
@@ -193,3 +193,14 @@ func laterObservationTime(a, b time.Time) time.Time {
 	}
 	return a
 }
+
+// observationStep names the fixed metadata check that refused, for operator
+// diagnostics (FixedStep); it wraps the original error.
+type observationStep struct {
+	step string
+	err  error
+}
+
+func (e *observationStep) Error() string     { return e.step }
+func (e *observationStep) Unwrap() error     { return e.err }
+func (e *observationStep) FixedStep() string { return e.step }
