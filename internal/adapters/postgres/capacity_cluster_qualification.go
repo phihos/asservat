@@ -63,7 +63,15 @@ func (s *CapacityClusterQualifications) ReadCapacityClusterQualifications(ctx co
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	raw, err := custodydb.New(s.ledger.pool).ReadCapacityClusterQualifications(call, id(s.root))
-	if err != nil || len(raw) > 1<<20 {
+	if err != nil {
+		// A timed-out query separates pool or server waits from a refusal
+		// (ADR-197 CI continuation run 17a never logged its failed reads).
+		if call.Err() != nil {
+			return nil, registryStep("query-timeout", err)
+		}
+		return nil, registryStep("query", err)
+	}
+	if len(raw) > 1<<20 {
 		return nil, value.ErrUnavailable
 	}
 	var rows []struct {

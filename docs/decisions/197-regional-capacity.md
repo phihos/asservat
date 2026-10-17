@@ -470,3 +470,18 @@ regional slot.
     composition and enrollment. No interval is renewed or extended, the
     authority reads become fresher, and every effect still follows every
     check. The hub cluster's local path is unchanged.
+  - [CI run 17b](../../test/results/adr197-continuation-ci-17b/native-continuation-1/context-storage-environment.json)
+    (39056242919, 22.6 minutes) **passed with the read-first path**: the
+    regional workload enrolled through the v2 exchange to `ready_at` with
+    a fresh binding, and the pool extended once. This is the first
+    complete installed two-cluster continuation pass of ADR-197. It uses
+    the fixture's explicit synthetic setup roots, like every earlier run.
+  - [CI run 17a](../../test/results/adr197-continuation-ci-17a/native-continuation-1/context-storage-environment.json)
+    (39056235249), the same commit, failed earlier. After its restart the
+    hub-worker started capacity with zero regional clusters and never
+    restarted the child with the joined cluster; runs 14–16 logged that
+    restart. The worker's retention reconciler also kept failing to begin
+    SQL transactions after that restart. The cluster watcher treats a
+    failed qualification read as no change and did not log it, so the run
+    cannot show why. The read now names its step (`query`,
+    `query-timeout`) and the watcher logs each change of outcome.

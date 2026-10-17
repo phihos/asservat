@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"slices"
 	"sync"
@@ -54,12 +55,23 @@ func (d *CapacityWorkerDeployment) watchClusters(ctx context.Context, work func(
 	go func() { done <- work(call) }()
 	tick := time.NewTicker(15 * time.Second)
 	defer tick.Stop()
+	failed := ""
 	for {
 		select {
 		case err := <-done:
 			return err
 		case <-tick.C:
 			current, err := d.qualifications.ReadCapacityClusterQualifications(call)
+			// One line per change: a read that keeps failing never sees a
+			// new cluster (ADR-197 CI continuation run 17a).
+			outcome := ""
+			if err != nil {
+				outcome = regionalOutcome(err)
+			}
+			if outcome != failed {
+				failed = outcome
+				fmt.Fprintln(os.Stderr, "capacity clusters read: "+regionalOutcome(err))
+			}
 			if err == nil && !slices.EqualFunc(current, d.regional, func(a, b app.CapacityNamespaceQualification) bool {
 				return a.ClusterID == b.ClusterID && a.Digest == b.Digest && slices.Equal(a.Keys, b.Keys)
 			}) {
