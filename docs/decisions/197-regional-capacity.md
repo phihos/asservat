@@ -426,3 +426,9 @@ regional slot.
     enrollment coordinator's steps (observation, read, reserve, mismatch,
     account, capture, publish) are now labelled and the cause is passed
     through.
+  - [Direct-observation CI run](../../test/results/adr197-direct-ci-2/native-direct-observation-1/context-storage-environment.json)
+    (run 39046711116, 6.5 minutes): the focused suite now runs every
+    capacity purpose, including the combined guarded workload, against
+    real Kubernetes in two clusters with the v2 holder path. All passed;
+    the guarded exchange took 2.99 s with 2.0 s of its window left. The
+    measurement-only spike that motivated decision 3 is removed.

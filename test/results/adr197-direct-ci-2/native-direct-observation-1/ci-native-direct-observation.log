@@ -1,0 +1,4 @@
++ python3 scripts/test-context-storage.py --run ^TestDirectHolderObservationWithRealKubernetes$
+Creating owned synthetic cluster 1
+Creating owned synthetic cluster 2
+Component test exit: 0
