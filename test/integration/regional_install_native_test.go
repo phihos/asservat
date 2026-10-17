@@ -560,7 +560,10 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": "regional"}, "spec": map[string]any{
 		"poolRef": "capacity", "scope": map[string]any{"clusterID": cluster, "namespaceSelector": map[string]any{"matchLabels": map[string]string{"team": "regional"}}},
 		"namespaceEnvelope": map[string]int64{"maxWorkloadAccounts": 1, "maxStoredBytes": 2147483648, "maxObjects": 2000},
-		"workload": map[string]any{"protected": amount(1073741824, 1000), "hardLimit": amount(2147483648, 2000), "contextReserve": amount(1073741824, 1000),
+		// The context reserve fits the root's qualified protocol (Records: 3):
+		// records = min(bytes/1544192, objects/4, 512) = 3. A larger reserve is
+		// refused at reservation as above the qualified protocol ceiling.
+		"workload": map[string]any{"protected": amount(1073741824, 1000), "hardLimit": amount(2147483648, 2000), "contextReserve": amount(3*1544192, 12),
 			"dump":                   map[string]int64{"burst": 1, "minimumIntervalSeconds": 900, "maxStartsPerRollingHour": 2, "maxInputBytesPerRollingHour": 4294967296},
 			"maxConcurrentExpensive": 1, "maxQueuedExpensive": 1, "maxQueueAgeSeconds": 30, "upload": map[string]int64{"bytesPerSecond": 33554432, "burstBytes": 4194304}, "maxUploadRequestsPerSecond": 20, "maxSpoolBytes": 2147483648, "onFull": "RejectNewExpensive"},
 		"node": map[string]any{"maxConcurrentExpensive": 2, "maxQueuedExpensive": 10, "upload": map[string]int64{"bytesPerSecond": 67108864, "burstBytes": 8388608}, "maxSpoolBytes": 4294967296, "impactProfileRef": "standard-node", "unhealthySamples": 3, "sampleIntervalSeconds": 5, "recoveryHealthySeconds": 60}}}

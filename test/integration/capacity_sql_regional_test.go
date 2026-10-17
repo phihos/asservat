@@ -2,12 +2,15 @@ package integration
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
 	"testing"
+	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/domain/artifact"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 )
 
 // qualifyRegionalExtension runs after the renewal stage on the same root
@@ -108,6 +111,30 @@ func (f *capacitySQLFixture) qualifyRegionalExtension(t *testing.T, first app.En
 			t.Fatal("a second root read revised the pool again", revisions, err)
 		}
 		read(t, "adopted")
+	}) {
+		return
+	}
+	// A regional workload composes under the adopted extension and spends the
+	// root's qualified accounts like any other: this fixture's earlier stages
+	// hold all of them, so the reservation is refused without a row. The
+	// native run enrolls one with accounts to spare.
+	if !t.Run("regional-workload-shares-the-qualified-accounts", func(t *testing.T) {
+		namespace := cfg.NamespaceRef{Name: "regional-apps", UID: custodyID()}
+		f.addPermissionScope(t, regional, namespace)
+		workload := cfg.WorkloadRef{Kind: "Deployment", Name: "regional-app", UID: custodyID()}
+		o := f.regionalObservation(t, regional, artifact.Digest{21}, namespace, workload)
+		count := func() (n int) {
+			if err := f.admin.QueryRow(f.ctx, `SELECT count(*) FROM capacity_workload WHERE root_id=$1`, root).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			return n
+		}
+		before := count()
+		_, err := (&app.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}).Reconcile(f.ctx, o)
+		var step interface{ FixedStep() string }
+		if before != capacityNativeAccounts || !errors.As(err, &step) || step.FixedStep() != "reserve" || count() != before {
+			t.Fatal("regional workload beyond the qualified accounts", before, err)
+		}
 	}) {
 		return
 	}

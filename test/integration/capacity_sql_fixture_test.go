@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"encoding/json"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -54,6 +55,7 @@ type capacitySQLFixture struct {
 	registered         map[string]artifact.Registration
 	fixturePool        func(string, string) *pgxpool.Pool
 	store              *objectstore.Store
+	authority          *objectstore.AuthorityObjects
 	keys               authorityTestKeys
 	processingPolicy   privacy.DownloadPolicy
 	additional         []app.Enrollment
@@ -87,6 +89,7 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	}
 	f.fixturePool = poolFor
 	f.store = objects.Store
+	f.authority = objects
 	// The original installation activation above uses real OpenBao. These
 	// subsequent synthetic context fixtures share the existing test key port;
 	// their SQL roles, encrypted objects and independent verification are real.
@@ -318,6 +321,53 @@ func (f *capacitySQLFixture) rootObservation(t *testing.T) app.RootBackingObserv
 	o, err := app.NewRootBackingObservation(f.qualification, source, p, recovery, time.Now())
 	if err != nil {
 		t.Fatal("composed root observation", err)
+	}
+	return o
+}
+
+// addPermissionScope accepts a further permission batch whose bases add one
+// maintainer scope in another cluster, and publishes its authority audit.
+func (f *capacitySQLFixture) addPermissionScope(t *testing.T, cluster string, namespace cfg.NamespaceRef) {
+	t.Helper()
+	base := f.batch.Bases[0]
+	base.Resource.UID = custodyID()
+	base.Scope = cfg.Scope{ClusterID: cluster, Namespace: namespace}
+	base.ScopeDigest = configapp.PermissionScopeDigest(base)
+	next := f.batch
+	next.Bases = append(slices.Clone(f.batch.Bases), base)
+	next.RequestID, next.InputDigest, next.Initial = custodyID(), artifact.Digest{byte(len(next.Bases)), 4}, nil
+	f.refreshFleet(t)
+	next.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+	next.FreshUntil = next.ObservedAt.Add(5 * time.Second)
+	accepted, err := f.permission.AcceptPermissions(f.ctx, next)
+	if err != nil {
+		t.Fatal("regional permission scope acceptance", err)
+	}
+	next.ExpectedSequence = accepted.Sequence
+	f.batch = next
+	for i := 0; i < 2; i++ {
+		if err = (auditapp.AuthorityPublisher{Ledger: f.permission, Objects: f.authority}).PublishAuthority(f.ctx); err != nil {
+			t.Fatal("regional permission audit", err)
+		}
+	}
+	f.refreshBase(t)
+}
+
+// regionalObservation composes a workload observation in another cluster
+// under that cluster's qualified namespace guard (ADR-197).
+func (f *capacitySQLFixture) regionalObservation(t *testing.T, cluster string, digest artifact.Digest, namespace cfg.NamespaceRef, workload cfg.WorkloadRef) app.EnrollmentObservation {
+	t.Helper()
+	source, recovery := f.fresh(t)
+	permissions, err := f.permissionRead.ReadCapacityPermissions(f.ctx, recovery)
+	if err != nil {
+		t.Fatal("regional maintainer scope", err)
+	}
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	until := identity.Earlier(n.Add(5*time.Second), recovery.FreshUntil)
+	guard := app.CapacityNamespaceProtection{ClusterID: cluster, Digest: digest, Keys: []string{"team"}, ObservedAt: n, FreshUntil: until}
+	o, _, err := app.ComposeEnrollmentObservation(source, guard, capacityNativeWorkload(cluster, namespace, workload, n, until), permissions, recovery, f.input.AccountVersion, time.Now())
+	if err != nil {
+		t.Fatal("composed regional workload observation", err)
 	}
 	return o
 }

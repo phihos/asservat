@@ -432,3 +432,16 @@ regional slot.
     real Kubernetes in two clusters with the v2 holder path. All passed;
     the guarded exchange took 2.99 s with 2.0 s of its window left. The
     measurement-only spike that motivated decision 3 is removed.
+  - [Local SQL runs 8–9](../../test/results/adr197-custody-9/environment.json)
+    reproduce the enrollment step in 78 s instead of a 28-minute native
+    run. The reservation's refusal is `capacity qualified account or
+    protocol ceiling reached`. In the native test the operator's regional
+    policy reserved 1 GiB and 1000 objects of context, which needs
+    min(1 GiB/1,544,192 B, 1000/4, 512) = 250 context records per
+    workload, while the installed root is qualified for 3 records per
+    account. The refusal is correct; the test's regional policy now
+    reserves exactly three records. The SQL stage asserts that a regional
+    workload spends the root's qualified accounts like any other and is
+    refused without a row when they are exhausted. Follow-up: a policy
+    above the root's qualified protocol is only refused at reservation;
+    source acceptance should report it to the operator.
