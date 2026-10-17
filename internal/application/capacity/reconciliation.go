@@ -192,6 +192,16 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 				if s.Work.Now().Before(ended[i].Add(p)) {
 					return
 				}
+			}
+			if w := s.Clusters[i].MinSourceWindow; w > 0 && cursors[i].pending() {
+				if _, v, ok := current.read(s.Work.Now()); !ok || v.FreshUntil.Sub(s.Work.Now()) < w {
+					if report := s.Clusters[i].Report; report != nil {
+						report(capacityStage("source-window", cfg.ErrUnavailable), 0)
+					}
+					return
+				}
+			}
+			if s.Clusters[i].Pace > 0 {
 				defer func() { ended[i] = s.Work.Now() }()
 			}
 			ns, candidate, found, err := cursors[i].next(call, s.Clusters[i].Workloads)

@@ -445,3 +445,20 @@ regional slot.
     refused without a row when they are exhausted. Follow-up: a policy
     above the root's qualified protocol is only refused at reservation;
     source acceptance should report it to the operator.
+  - [CI runs 14 and 15](../../test/results/adr197-continuation-ci-15a/native-continuation-1/context-storage-environment.json)
+    (39049020194, 39051059253, 39051064937): discovery observations always
+    succeed while guarded-workload observations mostly fail; run 15a had
+    two guarded successes, then composition refused. The common cause is
+    the accepted capacity source's interval. Every workload reconciliation
+    is bounded by the source snapshot current when it starts, and the
+    source loop renews that snapshot about once a second with five seconds
+    of freshness, so a guarded read typically starts with two to four
+    seconds left. A regional exchange needs 2.2–3 s and composition and
+    the SQL phases about 0.5 s more. Discovery LISTs run on the loop's
+    own budget, and the direct-observation suite has no source bound,
+    which is why both passed. A regional cluster now starts a queued
+    candidate's reconciliation only while the current source has at least
+    3.5 s left, retrying on later ticks without consuming the candidate;
+    no interval is renewed or extended. Also: a failed TokenReview call is
+    no longer reported as `denied`, composition names its steps, and the
+    regional cause words include the capacity errors.

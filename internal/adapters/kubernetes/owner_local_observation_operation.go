@@ -55,22 +55,25 @@ func (b *ownerLocalCallerBoundary) read(ctx context.Context, start, until time.T
 	}
 	name, err := b.reader.review(ctx, b.token, b.podUID)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, &observationStep{"caller-review", err}
 	}
 	expires, err := reviewedTokenExpiry(b.token, b.reader.client.now())
 	if err != nil {
-		return time.Time{}, value.ErrDenied
+		return time.Time{}, &observationStep{"caller-token-expiry", value.ErrDenied}
 	}
 	until = identity.Earlier(until, expires)
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	workload, err := b.reader.liveObjects(call, name, b.podUID, true)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, &observationStep{"caller-objects", err}
 	}
 	again, err := b.reader.review(call, b.token, b.podUID)
-	if err != nil || again != name {
-		return time.Time{}, value.ErrDenied
+	if err != nil {
+		return time.Time{}, &observationStep{"caller-review-again", err}
+	}
+	if again != name {
+		return time.Time{}, &observationStep{"caller-review-again", value.ErrDenied}
 	}
 	observed := value.ClusterObservationCaller{Pin: b.reader.pin, Pod: name, PodUID: b.podUID, ReplicaSet: workload.ReplicaSet, ReplicaSetUID: workload.ReplicaSetUID, WorkloadDigest: workload.Digest, ObservedAt: start, FreshUntil: until}
 	if call.Err() != nil || !observed.Valid(b.reader.client.now()) || b.first != nil && !b.first.SameWorkload(observed) {

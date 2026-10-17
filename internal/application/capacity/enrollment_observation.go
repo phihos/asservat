@@ -17,7 +17,7 @@ func ComposeEnrollmentObservation(source AcceptedCapacitySource, guard CapacityN
 	var zero EnrollmentObservation
 	var noBudget SelectedBudget
 	if !source.Valid(now) || !guard.Valid(now) || !workload.Valid(now) || !permissions.Valid(now) || !recovery.Valid(now) || !identity.Text(accountVersion, 64) || source.InstallationID != recovery.InstallationID || source.RootID != permissions.RootID || guard.ClusterID != workload.Namespace.ClusterID {
-		return zero, noBudget, cfg.ErrUnavailable
+		return zero, noBudget, capacityStage("inputs", cfg.ErrUnavailable)
 	}
 	k := WorkloadCapacityKey{source.RootID, workload.Namespace.ClusterID, workload.Namespace.Namespace.UID, workload.Workload.UID}
 	covered := false
@@ -28,19 +28,19 @@ func ComposeEnrollmentObservation(source AcceptedCapacitySource, guard CapacityN
 		}
 	}
 	if !covered {
-		return zero, noBudget, ErrCapacityNotAllocated
+		return zero, noBudget, capacityStage("permission-scope", ErrCapacityNotAllocated)
 	}
 	selected, e := SelectBudget(source.Observation.Snapshot, workload.Namespace, guard.Keys, now)
 	if e != nil {
-		return zero, noBudget, e
+		return zero, noBudget, capacityStage("select", e)
 	}
 	digest, e := SelectedCapacitySourceDigest(source.Observation.Snapshot, selected.Pool.Name)
 	if e != nil {
-		return zero, noBudget, e
+		return zero, noBudget, capacityStage("source-digest", e)
 	}
 	plan, e := CompileEnrollmentPlan(source, selected, accountVersion, now)
 	if e != nil {
-		return zero, noBudget, e
+		return zero, noBudget, capacityStage("plan", e)
 	}
 	labels := make(map[string]string, len(guard.Keys))
 	for _, k := range guard.Keys {

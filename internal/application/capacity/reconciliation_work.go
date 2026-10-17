@@ -33,6 +33,13 @@ type CapacityClusterReaders struct {
 	// about a hundred hub-side API calls, so its cluster never retries
 	// back-to-back (ADR-197); zero keeps the local cluster's cadence.
 	Pace time.Duration
+	// MinSourceWindow, when set, starts a candidate's reconciliation only
+	// while the current accepted source has at least this much freshness
+	// left. Every attempt stays bounded by that source's original interval,
+	// and a regional (v2) guarded read takes two to three seconds of it, so
+	// starting with less only wastes the read (ADR-197). Waiting renews
+	// nothing; the candidate stays queued for the next tick.
+	MinSourceWindow time.Duration
 	// Report, when set, receives each workload reconciliation's outcome and
 	// elapsed time. A refusal names its fixed stage (FixedStep).
 	Report func(error, time.Duration)

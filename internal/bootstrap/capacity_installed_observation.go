@@ -32,6 +32,11 @@ func (s mountedCapacityObservationToken) ReadClusterObservationToken(ctx context
 	return b, nil
 }
 
+// regionalSourceWindow is the accepted source freshness a regional guarded
+// read needs left when it starts: about 2.2 s for the v2 exchange and 0.5 s
+// for composition and the SQL phases, which the source interval bounds.
+const regionalSourceWindow = 3500 * time.Millisecond
+
 func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, s *installedCapacityWorkerInputs, observer, probe *kube.PermissionClient, in *providerInputs, pool *pgxpool.Pool, observerToken, probeToken string) ([]app.CapacityClusterReaders, []app.CapacityNamespaceQualification, error) {
 	c, m := d.input, d.manifest
 	if !s.matches(c, m) || pool == nil {
@@ -133,7 +138,7 @@ func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, 
 				return nil, nil, e
 			}
 			read.diagnose = true
-			out = append(out, app.CapacityClusterReaders{ClusterID: q.ClusterID, Workloads: read, Guard: read, Guarded: read, Pace: 2 * time.Second, Report: read.reportWorkload})
+			out = append(out, app.CapacityClusterReaders{ClusterID: q.ClusterID, Workloads: read, Guard: read, Guarded: read, Pace: 2 * time.Second, MinSourceWindow: regionalSourceWindow, Report: read.reportWorkload})
 		}
 	}
 	d.qualifications = qualifications

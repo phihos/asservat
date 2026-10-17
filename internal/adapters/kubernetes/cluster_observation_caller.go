@@ -54,7 +54,12 @@ func (s *ClusterObservationCallerAdmission) review(ctx context.Context, token []
 	}
 	raw, e := s.client.api.Post().AbsPath("/apis/authentication.k8s.io/v1/tokenreviews").Body(body).MaxRetries(0).DoRaw(ctx)
 	defer clear(raw)
-	if e != nil || permissionJSON(raw, 64<<10, 16384) != nil {
+	// A failed call (cancellation, limiter wait beyond the deadline, transport)
+	// is not a review result: it refuses as unavailable, never as denied.
+	if e != nil {
+		return "", &observationStep{"token-review-call", cfg.ErrUnavailable}
+	}
+	if permissionJSON(raw, 64<<10, 16384) != nil {
 		return "", value.ErrDenied
 	}
 	var r auth.TokenReview

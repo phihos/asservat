@@ -3,6 +3,7 @@ package capacity
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -190,4 +191,53 @@ func TestCapacityReconcilerPacesRegionalClusterIterations(t *testing.T) {
 			t.Fatal("paced cluster iterations", pace, n)
 		}
 	}
+}
+
+// ADR-197: a regional candidate's read starts only with enough source
+// freshness left; otherwise it waits on later ticks without consuming the
+// candidate or reconciling anything.
+func TestCapacityReconcilerStartsRegionalReadsOnlyWithEnoughSource(t *testing.T) {
+	for _, window := range []time.Duration{time.Hour, time.Millisecond} {
+		source, f := capacityObserverTestFixture()
+		q, _ := capacityQualificationFixture()
+		q.ID, q.Digest = f.accepted.QualificationID, f.accepted.QualificationDigest
+		q.RootBacking.RootID, q.RootBacking.InstallationID = f.accepted.RootID, f.accepted.InstallationID
+		q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
+		reader := &capacityRuntimeReader{recovery: f.recovery, pages: []CapacityWorkloadPage{{ResourceVersion: "work-1", Workloads: []cfg.WorkloadRef{{Kind: "Deployment", Name: "app", UID: "app-uid"}}}}}
+		work := &CapacityWorkReconciler{Qualification: q, Recovery: reader, Permissions: reader, Processing: reader, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: reader, Now: func() time.Time { return f.now }}
+		var mu sync.Mutex
+		stages := map[string]int{}
+		report := func(err error, _ time.Duration) {
+			step := "ok"
+			var s interface{ FixedStep() string }
+			if errors.As(err, &s) {
+				step = s.FixedStep()
+			}
+			mu.Lock()
+			stages[step]++
+			mu.Unlock()
+		}
+		runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{{ClusterID: q.NamespaceGuards[0].ClusterID, Workloads: reader, Guard: reader, MinSourceWindow: window, Report: report}}}
+		_ = source
+		ctx, cancel := context.WithTimeout(context.Background(), 1500*time.Millisecond)
+		_ = runner.RunWithSourceInvocation(ctx, staticCapacitySource{f.accepted})
+		cancel()
+		mu.Lock()
+		waited, attempted := stages["source-window"], 0
+		for k, n := range stages {
+			if k != "source-window" {
+				attempted += n
+			}
+		}
+		mu.Unlock()
+		if window == time.Hour && (waited == 0 || attempted != 0) || window == time.Millisecond && attempted == 0 {
+			t.Fatal("source window gate", window, stages)
+		}
+	}
+}
+
+type staticCapacitySource struct{ v AcceptedCapacitySource }
+
+func (s staticCapacitySource) Observe(context.Context) (AcceptedCapacitySource, error) {
+	return s.v, nil
 }

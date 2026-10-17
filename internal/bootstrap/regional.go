@@ -14,6 +14,7 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
+	capacityapp "asservat.local/asservat/internal/application/capacity"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -481,6 +482,14 @@ func regionalCause(err error) string {
 		return "hub-channel"
 	case errors.Is(err, errRegionalRefused):
 		return "hub-refused"
+	case errors.Is(err, capacityapp.ErrCapacityNotAllocated):
+		return "not-allocated"
+	case errors.Is(err, capacityapp.ErrBudgetFull):
+		return "budget-full"
+	case errors.Is(err, capacityapp.ErrBudgetInvalid):
+		return "budget-invalid"
+	case errors.Is(err, cfg.ErrChanged):
+		return "changed"
 	case errors.Is(err, value.ErrDenied):
 		return "denied"
 	case errors.Is(err, value.ErrInvalid):
