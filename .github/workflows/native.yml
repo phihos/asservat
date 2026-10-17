@@ -10,9 +10,7 @@ on:
       run:
         description: "Optional Go test filter (custody, fleet and context only)"
         default: ""
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.suite || 'all' }}
-  cancel-in-progress: true
+# Dispatch only: parallel variants of one suite never cancel each other.
 permissions:
   contents: read
 
