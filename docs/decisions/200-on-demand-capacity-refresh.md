@@ -86,3 +86,15 @@ always be refused.
   stage `refresh-demand-names-only-ready-workloads` and the native
   continuation's three consecutive fresh reads after a demand are pending
   qualification. Downloads still use discovery refreshes.
+- [CI continuation runs 22a–22c](../../test/results/adr200-continuation-ci-22a/native-continuation-1/context-storage-environment.json)
+  (39068539505, 39068545264, 39068550936) all failed. In 22a and 22c the
+  demand lane refreshed the regional binding (`ok` after 2.6–3.6 s), but other
+  attempts stopped at `guarded-read`, `source`, `enroll/read` or
+  `refresh-fresh` (the read's window ran out during the SQL steps), and while
+  the lane held the regional standbys, discovery's claims failed at `locate`.
+  22b never enrolled. The test's three consecutive fresh reads a second apart
+  cannot hold anyway: a refresh leaves at most about 2.3 s of freshness and the
+  next one commits about three seconds later. The test now samples the binding
+  every 250 ms for 15 s after the demand and requires three refreshes and one
+  sample with a second left, and each demand outcome is logged with the
+  guarded read's freshness left on return.

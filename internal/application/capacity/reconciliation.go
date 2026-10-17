@@ -1,6 +1,7 @@
 package capacity
 
 import (
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
 	"sync"
@@ -29,9 +30,10 @@ type CapacityReconciler struct {
 	Stalled func(clusterID, stage string)
 	// Demands, when set, adds the ADR-200 demand lane: workloads whose
 	// admission asked for a fresh binding are reconciled first, back to
-	// back, while the demand lasts. DemandReport sees each outcome.
+	// back, while the demand lasts. DemandReport sees each outcome, its
+	// elapsed time and the guarded read's freshness left when it returned.
 	Demands      CapacityRefreshDemandReader
-	DemandReport func(error, time.Duration)
+	DemandReport func(err error, elapsed, left time.Duration)
 	running      atomic.Bool
 }
 
@@ -234,7 +236,7 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 			// The candidate LIST does not confer freshness. The exact read gets a
 			// separate original source interval; no already-issued permit changes.
 			started := s.Work.Now()
-			err = s.reconcileCandidate(call, &current, s.Clusters[i], ns, candidate, mark)
+			_, err = s.reconcileCandidate(call, &current, s.Clusters[i], ns, candidate, mark)
 			if report := s.Clusters[i].Report; report != nil {
 				report(err, s.Work.Now().Sub(started))
 			}
@@ -256,30 +258,34 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 
 // reconcileCandidate runs one candidate through the regional guarded path
 // (ADR-197: the guarded read first, then the current source) or the ordinary
-// path. mark names the running stage for the stall watchdog.
-func (s *CapacityReconciler) reconcileCandidate(call context.Context, current *capacityCurrentSource, c CapacityClusterReaders, ns cfg.NamespaceRef, candidate cfg.WorkloadRef, mark func(string)) error {
+// path. mark names the running stage for the stall watchdog. It also returns
+// how much freshness the guarded read had left when it returned (zero on the
+// ordinary path), which bounds every later step.
+func (s *CapacityReconciler) reconcileCandidate(call context.Context, current *capacityCurrentSource, c CapacityClusterReaders, ns cfg.NamespaceRef, candidate cfg.WorkloadRef, mark func(string)) (time.Duration, error) {
 	var facts *CapacityGuardedFacts
+	var left time.Duration
 	if c.Guarded != nil {
 		mark("guarded-read")
 		v, err := s.Work.ReadGuardedCandidate(call, c, ns, candidate)
 		if err != nil {
-			return err
+			return 0, err
 		}
 		facts = &v
+		left = identity.Earlier(v.Guard.FreshUntil, v.Workload.FreshUntil).Sub(s.Work.Now())
 	}
 	original, v, ok := current.read(s.Work.Now())
 	if !ok {
-		return capacityStage("source", cfg.ErrUnavailable)
+		return left, capacityStage("source", cfg.ErrUnavailable)
 	}
 	until, _ := call.Deadline()
 	live, end := context.WithDeadline(original, until)
 	defer end()
 	if facts != nil {
 		mark("guarded-reconcile")
-		return s.Work.ReconcileGuardedWorkload(live, v, c, ns, candidate, *facts)
+		return left, s.Work.ReconcileGuardedWorkload(live, v, c, ns, candidate, *facts)
 	}
 	mark("reconcile")
-	return s.Work.ReconcileWorkload(live, v, c, ns, candidate)
+	return left, s.Work.ReconcileWorkload(live, v, c, ns, candidate)
 }
 
 // runDemands is the ADR-200 demand lane. Each step reads the active demands
@@ -300,9 +306,9 @@ func (s *CapacityReconciler) runDemands(root context.Context, current *capacityC
 				continue
 			}
 			started := s.Work.Now()
-			err = s.reconcileCandidate(call, current, c, d.Namespace, d.Workload, func(string) {})
+			left, err := s.reconcileCandidate(call, current, c, d.Namespace, d.Workload, func(string) {})
 			if s.DemandReport != nil {
-				s.DemandReport(err, s.Work.Now().Sub(started))
+				s.DemandReport(err, s.Work.Now().Sub(started), left)
 			}
 			return
 		}
